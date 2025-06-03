@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyperAV 4D Synthesizer - Flutter Integration</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0F0F1E;
+            font-family: "Courier New", monospace;
+        }
+        
+        #hypercube-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="hypercube-canvas"></canvas>
+    <script type="module">
+        import HypercubeCore from "./HypercubeCore.js";
+        import ShaderManager from "./ShaderManager.js";
+        import GeometryManager from "./GeometryManager.js";
+        import ProjectionManager from "./ProjectionManager.js";
+
+        window.hyperav = { core: null, initialized: false };
+
+        async function initializeHyperAV() {
+            const canvas = document.getElementById("hypercube-canvas");
+            
+            try {
+                const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+                if (!gl) throw new Error("WebGL not supported");
+
+                const geometryManager = new GeometryManager();
+                const projectionManager = new ProjectionManager();
+                const shaderManager = new ShaderManager(gl, geometryManager, projectionManager);
+
+                const core = new HypercubeCore(canvas, shaderManager, {
+                    geometryType: "hypercube",
+                    projectionMethod: "perspective",
+                    shaderProgramName: "maleficarumViz",
+                    colorScheme: {
+                        primary: [0.0, 1.0, 0.5],
+                        secondary: [0.48, 0.41, 0.93],
+                        background: [0.06, 0.06, 0.12]
+                    }
+                });
+
+                window.hyperav.core = core;
+                window.hyperav.initialized = true;
+                core.start();
+                
+                console.log("HyperAV initialized successfully");
+
+            } catch (error) {
+                console.error("HyperAV initialization failed:", error);
+            }
+        }
+
+        window.updateVisualizerParameter = function(parameterName, value) {
+            if (!window.hyperav.initialized || !window.hyperav.core) return;
+            
+            const params = {};
+            switch (parameterName) {
+                case "filterCutoff": params.morphFactor = value; break;
+                case "resonance": params.rotationSpeed = value * 2.0; break;
+                case "reverb": params.glitchIntensity = value * 0.5; break;
+                case "volume": params.patternIntensity = 0.5 + value * 1.5; break;
+                case "xyX": params.colorShift = (value - 0.5) * 2.0; break;
+                case "xyY": params.dimension = 3.0 + value * 2.0; break;
+                default: params[parameterName] = value; break;
+            }
+            
+            window.hyperav.core.updateParameters(params);
+        };
+
+        initializeHyperAV();
+        
+        function resizeCanvas() {
+            const canvas = document.getElementById("hypercube-canvas");
+            if (canvas) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+    </script>
+</body>
+</html>

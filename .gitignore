@@ -1,0 +1,6 @@
+# Synther Refactored - Professional Implementation
+*.g.dart
+*.freezed.dart
+.dart_tool/
+build/
+*.lock
