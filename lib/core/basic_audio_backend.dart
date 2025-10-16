@@ -70,7 +70,7 @@ class BasicAudioBackend implements AudioBackend {
 
   @override
   void noteOn(int voiceId, int note, double velocity) {
-    final clampedVelocity = clampValue(velocity, 0, 1);
+    final clampedVelocity = clampValue<double>(velocity, 0.0, 1.0);
     _activeVoices[voiceId] = _VoiceState(
       note: note,
       velocity: clampedVelocity,
@@ -116,8 +116,12 @@ class BasicAudioBackend implements AudioBackend {
 
       final releaseTime = _parameters[SynthParameterId.releaseTime] ?? 0.4;
       final elapsed = now.difference(voice.releasedAt ?? voice.started);
-      final releaseSeconds = releaseTime.clamp(0.05, 5.0);
-      final progress = clampValue(elapsed.inMilliseconds / 1000.0 / releaseSeconds, 0.0, 1.0);
+      final releaseSeconds = clampValue<double>(releaseTime, 0.05, 5.0);
+      final progress = clampValue<double>(
+        elapsed.inMilliseconds / 1000.0 / releaseSeconds,
+        0.0,
+        1.0,
+      );
       final level = (1 - progress) * voice.velocity;
 
       if (level <= 0.001) {
@@ -159,8 +163,11 @@ class BasicAudioBackend implements AudioBackend {
     }
 
     final now = DateTime.now();
-    final releaseSeconds = (_parameters[SynthParameterId.releaseTime] ?? 0.4)
-        .clamp(0.05, 5.0);
+    final releaseSeconds = clampValue<double>(
+      _parameters[SynthParameterId.releaseTime] ?? 0.4,
+      0.05,
+      5.0,
+    );
 
     _activeVoices.removeWhere((_, voice) {
       if (!voice.released) {

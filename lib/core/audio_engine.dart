@@ -39,6 +39,8 @@ class AudioEngine extends ChangeNotifier {
   double _reverbMix = 0.25;
   double _delayTime = 0.25;
   double _delayFeedback = 0.2;
+  int _nextVoiceId = 0;
+  final Map<int, List<int>> _voicesByNote = <int, List<int>>{};
 
   bool get isInitialized => _isInitialized;
   String? get lastError => _lastError;
@@ -240,14 +242,19 @@ class AudioEngine extends ChangeNotifier {
   void noteOn(int note, [double velocity = 1.0]) {
     if (!_backend.isInitialized) return;
     final normalisedVelocity = velocity.clamp(0.0, 1.0).toDouble();
-    _backend.noteOn(note, note, normalisedVelocity);
+    final voiceId = _allocateVoiceId(note);
+    _backend.noteOn(voiceId, note, normalisedVelocity);
     notifyListeners();
   }
 
   /// Release a note that was started with [noteOn].
   void noteOff(int note) {
     if (!_backend.isInitialized) return;
-    _backend.noteOff(note);
+    final voiceId = _releaseVoiceId(note);
+    if (voiceId == null) {
+      return;
+    }
+    _backend.noteOff(voiceId);
     notifyListeners();
   }
 
@@ -269,41 +276,75 @@ class AudioEngine extends ChangeNotifier {
   /// Load a preset structure.  The format is intentionally permissive so we can
   /// consume data from the various LLM services without additional transforms.
   Future<void> loadPreset(Map<String, dynamic> preset) async {
-    Future<void> setValue(dynamic rawValue, Future<void> Function(double, {bool notify}) setter) async {
-      if (rawValue == null) return;
-      final value = (rawValue as num).toDouble();
-      await setter(value, notify: false);
+    Future<void> setFromCandidates(
+      Iterable<dynamic> candidates,
+      Future<void> Function(double, {bool notify}) setter,
+    ) async {
+      for (final candidate in candidates) {
+        if (candidate is num) {
+          await setter(candidate.toDouble(), notify: false);
+          return;
+        }
+      }
     }
 
     final filter = preset['filter'] as Map<String, dynamic>?;
-    await setValue(filter?['cutoff'] ?? preset['filterCutoff'], setFilterCutoff);
-    await setValue(filter?['filterCutoff'], setFilterCutoff);
-    await setValue(filter?['resonance'] ?? preset['filterResonance'], setFilterResonance);
+    await setFromCandidates([
+      filter?['cutoff'],
+      filter?['filterCutoff'],
+      preset['filterCutoff'],
+    ], setFilterCutoff);
+    await setFromCandidates([
+      filter?['resonance'],
+      filter?['filterResonance'],
+      preset['filterResonance'],
+    ], setFilterResonance);
 
     final envelope = preset['envelope'] as Map<String, dynamic>?;
-    await setValue(
-      envelope?['attack'] ?? envelope?['attackTime'] ?? preset['attack'] ?? preset['attackTime'],
-      setAttackTime,
-    );
-    await setValue(
-      envelope?['decay'] ?? envelope?['decayTime'] ?? preset['decay'] ?? preset['decayTime'],
-      setDecayTime,
-    );
-    await setValue(
-      envelope?['sustain'] ?? envelope?['sustainLevel'] ?? preset['sustain'] ?? preset['sustainLevel'],
-      setSustainLevel,
-    );
-    await setValue(
-      envelope?['release'] ?? envelope?['releaseTime'] ?? preset['release'] ?? preset['releaseTime'],
-      setReleaseTime,
-    );
+    await setFromCandidates([
+      envelope?['attack'],
+      envelope?['attackTime'],
+      preset['attack'],
+      preset['attackTime'],
+    ], setAttackTime);
+    await setFromCandidates([
+      envelope?['decay'],
+      envelope?['decayTime'],
+      preset['decay'],
+      preset['decayTime'],
+    ], setDecayTime);
+    await setFromCandidates([
+      envelope?['sustain'],
+      envelope?['sustainLevel'],
+      preset['sustain'],
+      preset['sustainLevel'],
+    ], setSustainLevel);
+    await setFromCandidates([
+      envelope?['release'],
+      envelope?['releaseTime'],
+      preset['release'],
+      preset['releaseTime'],
+    ], setReleaseTime);
 
     final effects = preset['effects'] as Map<String, dynamic>?;
-    await setValue(effects?['reverb'] ?? effects?['reverbMix'] ?? preset['reverbMix'], setReverbMix);
-    await setValue(effects?['delayTime'] ?? preset['delayTime'], setDelayTime);
-    await setValue(effects?['delayFeedback'] ?? preset['delayFeedback'], setDelayFeedback);
+    await setFromCandidates([
+      effects?['reverb'],
+      effects?['reverbMix'],
+      preset['reverbMix'],
+    ], setReverbMix);
+    await setFromCandidates([
+      effects?['delayTime'],
+      preset['delayTime'],
+    ], setDelayTime);
+    await setFromCandidates([
+      effects?['delayFeedback'],
+      preset['delayFeedback'],
+    ], setDelayFeedback);
 
-    await setValue(preset['masterVolume'] ?? preset['volume'], setMasterVolume);
+    await setFromCandidates([
+      preset['masterVolume'],
+      preset['volume'],
+    ], setMasterVolume);
 
     notifyListeners();
   }
@@ -358,6 +399,30 @@ class AudioEngine extends ChangeNotifier {
       _syncManagerHooked = false;
       _isInitialized = false;
     }
+    _voicesByNote.clear();
+    _nextVoiceId = 0;
     super.dispose();
+  }
+
+  int _allocateVoiceId(int note) {
+    final voiceId = _nextVoiceId++;
+    if (_nextVoiceId == 0x7fffffff) {
+      _nextVoiceId = 0;
+    }
+    final voices = _voicesByNote.putIfAbsent(note, () => <int>[]);
+    voices.add(voiceId);
+    return voiceId;
+  }
+
+  int? _releaseVoiceId(int note) {
+    final voices = _voicesByNote[note];
+    if (voices == null || voices.isEmpty) {
+      return null;
+    }
+    final voiceId = voices.removeLast();
+    if (voices.isEmpty) {
+      _voicesByNote.remove(note);
+    }
+    return voiceId;
   }
 }

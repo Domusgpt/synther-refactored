@@ -2,6 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+
+/// Identifies the origin of a parameter update so changes are not echoed back
+/// to the sender.
+enum ParameterUpdateSource { ui, audio, visualizer }
 
 /// Central parameter bridge for 3-way synchronization between UI, Audio, and Visualizer
 class ParameterBridge {
@@ -16,9 +21,6 @@ class ParameterBridge {
   
   // Current parameter values
   final Map<String, double> _parameters = {};
-  
-  // Update sources
-  enum UpdateSource { ui, audio, visualizer }
   
   // Registered handlers for each system
   void Function(String, double)? _audioHandler;
@@ -39,7 +41,7 @@ class ParameterBridge {
   }
   
   // Update parameter from any source
-  void updateParameter(String name, double value, UpdateSource source) {
+  void updateParameter(String name, double value, ParameterUpdateSource source) {
     // Store current value
     _parameters[name] = value;
     
@@ -58,17 +60,17 @@ class ParameterBridge {
     _propagateUpdate(name, value, source);
   }
   
-  void _propagateUpdate(String name, double value, UpdateSource source) {
+  void _propagateUpdate(String name, double value, ParameterUpdateSource source) {
     // Don't send update back to source
-    if (source != UpdateSource.audio && _audioHandler != null) {
+    if (source != ParameterUpdateSource.audio && _audioHandler != null) {
       _audioHandler!(name, value);
     }
-    
-    if (source != UpdateSource.visualizer && _visualizerHandler != null) {
+
+    if (source != ParameterUpdateSource.visualizer && _visualizerHandler != null) {
       _visualizerHandler!(name, value);
     }
-    
-    if (source != UpdateSource.ui && _uiHandler != null) {
+
+    if (source != ParameterUpdateSource.ui && _uiHandler != null) {
       _uiHandler!(name, value);
     }
   }
@@ -80,7 +82,7 @@ class ParameterBridge {
   Map<String, double> getAllParameters() => Map.from(_parameters);
   
   // Batch update parameters
-  void batchUpdate(Map<String, double> parameters, UpdateSource source) {
+  void batchUpdate(Map<String, double> parameters, ParameterUpdateSource source) {
     parameters.forEach((name, value) {
       updateParameter(name, value, source);
     });
@@ -135,7 +137,7 @@ class ParameterBridge {
 class ParameterUpdate {
   final String name;
   final double value;
-  final ParameterBridge.UpdateSource source;
+  final ParameterUpdateSource source;
   final DateTime timestamp;
   
   ParameterUpdate({
@@ -187,7 +189,7 @@ class ParameterMapping {
         curved = normalized;
         break;
       case ParameterCurve.exponential:
-        curved = normalized.sign * normalized.abs().sqrt();
+        curved = normalized.sign * math.sqrt(normalized.abs());
         break;
       case ParameterCurve.logarithmic:
         if (normalized <= 0) {
@@ -227,7 +229,7 @@ mixin ParameterBridgeMixin<T extends StatefulWidget> on State<T> {
   }
   
   // Override to handle parameter updates
-  void onParameterUpdate(String name, double value, ParameterBridge.UpdateSource source) {}
+  void onParameterUpdate(String name, double value, ParameterUpdateSource source) {}
   
   void _onParameterUpdate(ParameterUpdate update) {
     if (mounted) {
@@ -237,6 +239,6 @@ mixin ParameterBridgeMixin<T extends StatefulWidget> on State<T> {
   
   // Helper to update parameter from this widget
   void updateParameter(String name, double value) {
-    _bridge.updateParameter(name, value, ParameterBridge.UpdateSource.ui);
+    _bridge.updateParameter(name, value, ParameterUpdateSource.ui);
   }
 }
