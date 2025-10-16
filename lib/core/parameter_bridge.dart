@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
+
+import 'voice_allocator.dart';
 
 /// Central parameter bridge for 3-way synchronization between UI, Audio, and Visualizer
 class ParameterBridge {
@@ -27,7 +31,13 @@ class ParameterBridge {
   void registerAudioHandler(void Function(String, double) handler) {
     _audioHandler = handler;
   }
-  
+
+  void unregisterAudioHandler(void Function(String, double) handler) {
+    if (identical(_audioHandler, handler)) {
+      _audioHandler = null;
+    }
+  }
+
   void registerVisualizerHandler(void Function(String, double) handler) {
     _visualizerHandler = handler;
   }
@@ -85,8 +95,14 @@ class ParameterBridge {
   }
   
   // Parameter mapping definitions
-  static const Map<String, ParameterMapping> mappings = {
+  static final Map<String, ParameterMapping> mappings = <String, ParameterMapping>{
     'filterCutoff': ParameterMapping(
+      min: 20,
+      max: 20000,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'geometryComplexity',
+    ),
+    'cutoff': ParameterMapping(
       min: 20,
       max: 20000,
       curve: ParameterCurve.exponential,
@@ -98,11 +114,101 @@ class ParameterBridge {
       curve: ParameterCurve.linear,
       visualizerParam: 'colorIntensity',
     ),
+    'resonance': ParameterMapping(
+      min: 0,
+      max: 1,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'colorIntensity',
+    ),
     'reverbMix': ParameterMapping(
       min: 0,
       max: 1,
       curve: ParameterCurve.linear,
       visualizerParam: 'spaceSize',
+    ),
+    'reverb': ParameterMapping(
+      min: 0,
+      max: 1,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'spaceSize',
+    ),
+    'attackTime': ParameterMapping(
+      min: 0.001,
+      max: 5,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'envelopeAttack',
+    ),
+    'attack': ParameterMapping(
+      min: 0.001,
+      max: 5,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'envelopeAttack',
+    ),
+    'decayTime': ParameterMapping(
+      min: 0.001,
+      max: 5,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'envelopeDecay',
+    ),
+    'decay': ParameterMapping(
+      min: 0.001,
+      max: 5,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'envelopeDecay',
+    ),
+    'sustainLevel': ParameterMapping(
+      min: 0,
+      max: 1,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'envelopeSustain',
+    ),
+    'sustain': ParameterMapping(
+      min: 0,
+      max: 1,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'envelopeSustain',
+    ),
+    'releaseTime': ParameterMapping(
+      min: 0.01,
+      max: 10,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'envelopeRelease',
+    ),
+    'release': ParameterMapping(
+      min: 0.01,
+      max: 10,
+      curve: ParameterCurve.exponential,
+      visualizerParam: 'envelopeRelease',
+    ),
+    'delayTime': ParameterMapping(
+      min: 0.01,
+      max: 2,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'delayTime',
+    ),
+    'delayFeedback': ParameterMapping(
+      min: 0,
+      max: 0.95,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'delayFeedback',
+    ),
+    'maxPolyphony': ParameterMapping(
+      min: 1,
+      max: VoiceAllocator.hardVoiceCeiling.toDouble(),
+      curve: ParameterCurve.linear,
+      visualizerParam: 'polyphony',
+    ),
+    'polyphony': ParameterMapping(
+      min: 1,
+      max: VoiceAllocator.hardVoiceCeiling.toDouble(),
+      curve: ParameterCurve.linear,
+      visualizerParam: 'polyphony',
+    ),
+    'voices': ParameterMapping(
+      min: 1,
+      max: VoiceAllocator.hardVoiceCeiling.toDouble(),
+      curve: ParameterCurve.linear,
+      visualizerParam: 'polyphony',
     ),
     'xyPadX': ParameterMapping(
       min: 0,
@@ -122,7 +228,21 @@ class ParameterBridge {
       curve: ParameterCurve.linear,
       visualizerParam: 'brightness',
     ),
+    'volume': ParameterMapping(
+      min: 0,
+      max: 1,
+      curve: ParameterCurve.linear,
+      visualizerParam: 'brightness',
+    ),
   };
+
+  @visibleForTesting
+  void resetForTesting() {
+    _parameters.clear();
+    _audioHandler = null;
+    _visualizerHandler = null;
+    _uiHandler = null;
+  }
   
   void dispose() {
     _parameterController.close();
@@ -169,26 +289,37 @@ class ParameterMapping {
       case ParameterCurve.exponential:
         return normalized * normalized;
       case ParameterCurve.logarithmic:
-        return normalized.sign * normalized.abs().log() / 2.3; // ln(10)
+        if (normalized <= 0) {
+          return 0;
+        }
+        return math.log(normalized * 9 + 1) / math.log(10);
     }
   }
   
   // Map normalized value back to real range
   double denormalize(double normalized) {
     double curved;
-    
+
     switch (curve) {
       case ParameterCurve.linear:
-        curved = normalized;
+        final clamped = normalized.clamp(0.0, 1.0).toDouble();
+        curved = clamped;
         break;
       case ParameterCurve.exponential:
-        curved = normalized.sign * normalized.abs().sqrt();
+        final clamped = normalized.clamp(0.0, 1.0).toDouble();
+        curved = math.sqrt(clamped);
         break;
       case ParameterCurve.logarithmic:
-        curved = normalized.sign * (normalized.abs() * 2.3).exp();
+        final clamped = normalized.clamp(0.0, 1.0).toDouble();
+        if (clamped <= 0) {
+          curved = 0;
+        } else {
+          final powValue = math.pow(10, clamped) as num;
+          curved = ((powValue - 1) / 9).toDouble();
+        }
         break;
     }
-    
+
     return min + curved * (max - min);
   }
 }
