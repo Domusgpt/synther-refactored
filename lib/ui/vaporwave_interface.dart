@@ -3,11 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:glassmorphism/glassmorphism.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/rendering.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../core/audio_engine.dart';
 import '../visualizer/hypercube_visualizer.dart';
 import 'holographic_widgets.dart';
+import 'modulation_matrix_panel.dart';
+import 'tempo_transport_panel.dart';
+import '../utils/ui_snapshotter.dart';
+import 'ui_snapshot_panel.dart';
 
 /// Revolutionary Vaporwave Holographic Interface
 /// 
@@ -19,7 +24,7 @@ class VaporwaveInterface extends StatefulWidget {
   State<VaporwaveInterface> createState() => _VaporwaveInterfaceState();
 }
 
-class _VaporwaveInterfaceState extends State<VaporwaveInterface> 
+class _VaporwaveInterfaceState extends State<VaporwaveInterface>
     with TickerProviderStateMixin {
   
   // Animation controllers for parallax and breathing effects
@@ -36,6 +41,8 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
   // UI state
   bool _isFullscreen = false;
   double _globalDepth = 0.0;
+  final GlobalKey _snapshotBoundaryKey = GlobalKey(debugLabel: 'vaporwaveSnapshot');
+  bool _isCapturingSnapshot = false;
   
   @override
   void initState() {
@@ -143,8 +150,10 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
                 _globalDepth = (details.localPosition.dy / MediaQuery.of(context).size.height);
               });
             },
-            child: Stack(
-              children: [
+            child: RepaintBoundary(
+              key: _snapshotBoundaryKey,
+              child: Stack(
+                children: [
                 // 4D Visualizer Background Layer
                 Positioned.fill(
                   child: Transform.scale(
@@ -333,8 +342,8 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
       top: 50,
       right: 20,
       child: GlassmorphicContainer(
-        width: 200,
-        height: 100,
+        width: 220,
+        height: 200,
         borderRadius: 15,
         blur: 20,
         alignment: Alignment.center,
@@ -357,12 +366,163 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatusText('ENGINE', audioEngine.isInitialized ? 'ACTIVE' : 'OFFLINE'),
-              _buildStatusText('LATENCY', '3.2ms'),
-              _buildStatusText('4D MODE', 'HYPERCUBE'),
+              _buildStatusText(
+                  'TEMPO', '${audioEngine.transportTempo.toStringAsFixed(1)} BPM'),
+              _buildStatusText(
+                  'SIGNATURE',
+                  '${audioEngine.transportTimeSignatureNumerator}/${audioEngine.transportTimeSignatureDenominator}'),
+              _buildStatusText(
+                  'TRANSPORT', audioEngine.transportRunning ? 'RUNNING' : 'STOPPED'),
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0x3300FFFF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      onPressed: () => _openModulationMatrixPanel(audioEngine),
+                      child: const Text('MOD MATRIX'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0x33FF00FF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      onPressed: () => _openTempoTransportPanel(audioEngine),
+                      child: const Text('TRANSPORT'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 40,
+                    width: 44,
+                    child: Tooltip(
+                      message: 'Capture UI snapshot & metrics',
+                      child: FilledButton.tonal(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0x33FFFFFF),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.zero,
+                        ),
+                        onPressed: _isCapturingSnapshot
+                            ? null
+                            : () => _captureSnapshot(audioEngine),
+                        child: _isCapturingSnapshot
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white70,
+                                ),
+                              )
+                            : const Icon(Icons.camera_alt_outlined, size: 18),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _captureSnapshot(AudioEngine audioEngine) async {
+    final boundaryContext = _snapshotBoundaryKey.currentContext;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final renderObject = boundaryContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Snapshot boundary not ready. Try again.')),
+      );
+      return;
+    }
+
+    setState(() => _isCapturingSnapshot = true);
+    try {
+      final imageBytes = await UISnapshotter.captureBoundary(renderObject);
+      final metadata = _collectSnapshotMetadata(audioEngine);
+      if (!mounted) {
+        return;
+      }
+
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          return UISnapshotPanel(
+            imageBytes: imageBytes,
+            metadata: metadata,
+          );
+        },
+      );
+    } catch (error) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Snapshot failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCapturingSnapshot = false);
+      }
+    }
+  }
+
+  UISnapshotMetadata _collectSnapshotMetadata(AudioEngine audioEngine) {
+    final visualizerMetrics = audioEngine.getVisualizerData();
+    return UISnapshotMetadata(
+      capturedAt: DateTime.now(),
+      activeVoices: audioEngine.activeVoiceCount,
+      maxPolyphony: audioEngine.maxPolyphony,
+      transportTempo: audioEngine.transportTempo,
+      transportRunning: audioEngine.transportRunning,
+      presetName: audioEngine.activePreset?.metadata.name,
+      visualizerMetrics: visualizerMetrics,
+    );
+  }
+
+  void _openModulationMatrixPanel(AudioEngine audioEngine) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ChangeNotifierProvider.value(
+          value: audioEngine,
+          child: const ModulationMatrixPanel(),
+        );
+      },
+    );
+  }
+
+  void _openTempoTransportPanel(AudioEngine audioEngine) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ChangeNotifierProvider.value(
+          value: audioEngine,
+          child: const TempoTransportPanel(),
+        );
+      },
     );
   }
   
