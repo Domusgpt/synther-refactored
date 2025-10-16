@@ -41,27 +41,54 @@ iteration ended.
 
 ## Tooling & Environment Notes
 
-- The container environment currently lacks the Flutter/Dart SDK, so commands
-  like `flutter test` or `dart test` cannot be executed here. Install Flutter
-  (3.19+) locally to run the full test suite.
-- Add `melos` or `very_good_cli` if you plan to manage multiple packages or run
-  lint/test pipelines from a single command.
-- Consider installing `dart fix --apply` and `flutter analyze` hooks in CI to
-  keep the growing codebase tidy, especially now that modulation routing adds
-  richer JSON surface areas.
-- For authoring presets or modulation tables, tools like [Open Stage Control](https://openstagecontrol.ammd.net/)
-  or the `ctrlr` panel editor can speed up MIDI/controller exploration before
-  encoding routes into JSON.
+- The shared development shell now includes Flutter 3.35.6 cloned to
+  `/workspace/flutter`, along with the Linux desktop toolchain and project
+  dependencies installed via `flutter pub get`. Optional components reported by
+  `flutter doctor`—the Android SDK/Studio stack and Chrome—remain absent and must
+  be installed separately if mobile or web builds are required in this
+  environment.【86a5b9†L1-L21】【1f6f1f†L1-L24】
+- Static analysis currently reports 1,640 issues spanning missing design-token
+  definitions, undeclared plugin imports (`google_mobile_ads`, `file_picker`,
+  `path_provider`, `shared_preferences`), API breakages in the parameter bridge,
+  and numerous deprecation warnings introduced by the latest UI refactor. These
+  errors prevent the project from compiling until the missing symbols and
+  dependencies are restored.【75c1f8†L1-L120】
+- The regression suite fails to load modules that depend on the broken bridge
+  API and type mismatches in the audio backend. Resolving the analyzer errors is
+  prerequisite to re-enabling the tests that previously exercised the audio
+  engine and UI synchronisation layers.【4168d2†L1-L82】【14eeb9†L1-L17】【cfc1bf†L1-L22】
 
-## Quick Start for the Next Engineer
+## Immediate Next Development Steps
 
-1. Install Flutter (`flutter doctor`) and run `tool/setup_dev_environment.sh`
-   to pull dependencies and enable web/desktop targets if needed.
-2. Execute `flutter test` locally to exercise the expanded regression suite.
-3. Explore the modulation matrix by calling `AudioEngine.setModulationRoute` in
-   integration tests or the debug console and inspect the visualiser metrics via
-   `AudioEngine.getVisualizerData()`.
-4. Extend the UI or preset authoring tools to write to
-   `ModulationMatrixCodec.encodeBridgeKey(source, destination)` so audio, UI, and
-   visualiser layers stay synchronised.
+1. **Restore compile-time dependencies.** Re-introduce or replace the missing
+   design-token API and add the required Flutter plugins (`google_mobile_ads`,
+   `file_picker`, `path_provider`, `shared_preferences`). The analyzer failures
+   highlight every location where symbols are currently undefined, making it
+   straightforward to prioritise the repairs.【75c1f8†L1-L120】
+2. **Stabilise the parameter bridge contract.** Move the `UpdateSource` enum to
+   the library level, reintroduce the `StatefulWidget`/`State` mixin bounds, and
+   ensure mixins call `super` only when the target class implements those
+   methods. The refactor placed these declarations inside the class body,
+   breaking the bridge, audio engine, and associated tests.【4168d2†L1-L82】
+3. **Fix numeric and API regressions in the backends.** Update
+   `BasicAudioBackend` velocity clamping to emit doubles, and audit references to
+   constants like `AudioParameters` that were renamed or removed during the UI
+   overhaul.【4168d2†L55-L82】【cfc1bf†L1-L22】
+4. **Rerun analyzer and tests.** Once the blockers above are addressed, execute
+   `flutter analyze` and `flutter test` to confirm the codebase is back to a
+   green state before tackling any new feature polish.【75c1f8†L1-L120】【f53c5c†L1-L8】
+
+## Expansion & Polish Roadmap
+
+- **Stabilisation & Regression Recovery.** Focus on eliminating the analyzer
+  errors, restoring broken imports, and repairing the parameter bridge so the
+  application compiles and the regression suite passes again. This ensures the
+  new multi-panel UI and visualiser can be exercised end-to-end.【75c1f8†L1-L120】【4168d2†L1-L82】
+- **Experience Polish.** Once stable, iterate on the VIB34D-inspired interface
+  to refine responsive breakpoints, revisit typography tokens, and smooth the
+  modulation editor interactions introduced in the refactor.【F:lib/ui/vaporwave_interface.dart†L1-L40】【75c1f8†L1-L120】
+- **Feature Expansion.** After the foundation is reliable, explore deeper audio
+  integrations (WebAudio backend parity, ad mediation hooks) and advanced
+  performance tooling (preset migrations, analytics overlays) that were outlined
+  in prior opportunities.【F:lib/core/platform_audio_backend.dart†L1-L80】【75c1f8†L1-L120】
 

@@ -2,8 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import 'audio_backend.dart';
 import 'basic_audio_backend.dart';
+import 'web_audio_backend_stub.dart'
+    if (dart.library.html) 'web_audio_backend.dart';
 
 AudioBackend createAudioBackend() {
+  if (kIsWeb) {
+    return WebAudioBackend();
+  }
+
   _SharedBackendRegistry.instance._retain();
   return _SharedBackendHandle(_SharedBackendRegistry.instance);
 }
