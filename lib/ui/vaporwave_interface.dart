@@ -8,6 +8,8 @@ import 'dart:math' as math;
 import '../core/audio_engine.dart';
 import '../visualizer/hypercube_visualizer.dart';
 import 'holographic_widgets.dart';
+import 'modulation_matrix_panel.dart';
+import 'tempo_transport_panel.dart';
 
 /// Revolutionary Vaporwave Holographic Interface
 /// 
@@ -333,8 +335,8 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
       top: 50,
       right: 20,
       child: GlassmorphicContainer(
-        width: 200,
-        height: 100,
+        width: 220,
+        height: 200,
         borderRadius: 15,
         blur: 20,
         alignment: Alignment.center,
@@ -357,12 +359,81 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatusText('ENGINE', audioEngine.isInitialized ? 'ACTIVE' : 'OFFLINE'),
-              _buildStatusText('LATENCY', '3.2ms'),
-              _buildStatusText('4D MODE', 'HYPERCUBE'),
+              _buildStatusText(
+                  'TEMPO', '${audioEngine.transportTempo.toStringAsFixed(1)} BPM'),
+              _buildStatusText(
+                  'SIGNATURE',
+                  '${audioEngine.transportTimeSignatureNumerator}/${audioEngine.transportTimeSignatureDenominator}'),
+              _buildStatusText(
+                  'TRANSPORT', audioEngine.transportRunning ? 'RUNNING' : 'STOPPED'),
+              const Spacer(),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0x3300FFFF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      onPressed: () => _openModulationMatrixPanel(audioEngine),
+                      child: const Text('MOD MATRIX'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0x33FF00FF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      onPressed: () => _openTempoTransportPanel(audioEngine),
+                      child: const Text('TRANSPORT'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _openModulationMatrixPanel(AudioEngine audioEngine) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ChangeNotifierProvider.value(
+          value: audioEngine,
+          child: const ModulationMatrixPanel(),
+        );
+      },
+    );
+  }
+
+  void _openTempoTransportPanel(AudioEngine audioEngine) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ChangeNotifierProvider.value(
+          value: audioEngine,
+          child: const TempoTransportPanel(),
+        );
+      },
     );
   }
   
