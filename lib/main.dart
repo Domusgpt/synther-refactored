@@ -65,7 +65,7 @@ class HolographicSynthApp extends StatelessWidget {
             primary: Color(0xFF00FFFF),
             secondary: Color(0xFFFF00FF),
             surface: Color(0xFF000010),
-            surface: Color(0xFF000000),
+            background: Color(0xFF000000),
           ),
           fontFamily: 'monospace',
         ),
