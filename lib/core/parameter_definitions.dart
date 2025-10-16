@@ -13,7 +13,11 @@ class SynthParameterId {
   static const int oscillatorPanning = 4;
   static const int oscillatorFineTune = 5;
   static const int oscillatorPulseWidth = 6;
-  
+
+  // LFO parameters
+  static const int lfoRate = 7;
+  static const int lfoDepth = 8;
+
   // Filter parameters
   static const int filterCutoff = 10;
   static const int filterResonance = 11;
