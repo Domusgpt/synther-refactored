@@ -1,0 +1,351 @@
+import 'dart:collection';
+
+import 'parameter_models.dart';
+import 'voice_allocator.dart';
+
+/// Rich metadata describing how a synthesiser parameter behaves.
+class ParameterDescriptor {
+  const ParameterDescriptor({
+    required this.name,
+    required this.range,
+    required this.visualizerTarget,
+    this.bridgeAliases = const <String>[],
+    this.extractionHints = const <String>[],
+  });
+
+  /// Canonical parameter name used within the audio engine.
+  final String name;
+
+  /// Numerical range and curve metadata for the parameter.
+  final ParameterRange range;
+
+  /// Identifier consumed by the visualiser bridge.
+  final String visualizerTarget;
+
+  /// Aliases that should mirror updates across the UI/audio bridge.
+  final List<String> bridgeAliases;
+
+  /// Additional keys accepted when parsing preset or JSON data.
+  final List<String> extractionHints;
+
+  /// Returns every recognised key for this parameter (canonical + aliases).
+  Iterable<String> get allKeys sync* {
+    yield name;
+    for (final alias in bridgeAliases) {
+      yield alias;
+    }
+    for (final hint in extractionHints) {
+      yield hint;
+    }
+  }
+}
+
+/// Central registry that exposes canonical parameter metadata, alias lookups,
+/// and helper utilities for synchronising data across systems.
+class ParameterRegistry {
+  ParameterRegistry._() {
+    _register(
+      ParameterDescriptor(
+        name: 'masterVolume',
+        range: const ParameterRange(
+          min: 0,
+          max: 1,
+          defaultValue: 0.75,
+          curve: ParameterCurve.linear,
+        ),
+        visualizerTarget: 'brightness',
+        bridgeAliases: const <String>['volume'],
+        extractionHints: const <String>[
+          'mastervolume',
+          'amplevel',
+          'ampvolume',
+          'amp',
+          'outputvolume',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'filterCutoff',
+        range: const ParameterRange(
+          min: 20,
+          max: 20000,
+          defaultValue: 1200,
+          curve: ParameterCurve.exponential,
+        ),
+        visualizerTarget: 'geometryComplexity',
+        bridgeAliases: const <String>['cutoff'],
+        extractionHints: const <String>[
+          'filtercutoff',
+          'filtercut',
+          'filterfrequency',
+          'filterfreq',
+          'cutoffhz',
+          'filterhz',
+          'filtercutoffhz',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'filterResonance',
+        range: const ParameterRange(
+          min: 0,
+          max: 1,
+          defaultValue: 0.35,
+          curve: ParameterCurve.linear,
+        ),
+        visualizerTarget: 'colorIntensity',
+        bridgeAliases: const <String>['resonance'],
+        extractionHints: const <String>[
+          'filterresonance',
+          'res',
+          'filterres',
+          'filterq',
+          'q',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'attackTime',
+        range: const ParameterRange(
+          min: 0.001,
+          max: 5,
+          defaultValue: 0.02,
+          curve: ParameterCurve.exponential,
+        ),
+        visualizerTarget: 'envelopeAttack',
+        bridgeAliases: const <String>['attack'],
+        extractionHints: const <String>[
+          'attacktime',
+          'envelopeattack',
+          'envelopeattacktime',
+          'adsrattack',
+          'adsrattacktime',
+          'envattack',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'decayTime',
+        range: const ParameterRange(
+          min: 0.001,
+          max: 5,
+          defaultValue: 0.2,
+          curve: ParameterCurve.exponential,
+        ),
+        visualizerTarget: 'envelopeDecay',
+        bridgeAliases: const <String>['decay'],
+        extractionHints: const <String>[
+          'decaytime',
+          'envelopedecay',
+          'envelopedecaytime',
+          'adsrdecay',
+          'adsrdecaytime',
+          'envdecay',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'sustainLevel',
+        range: const ParameterRange(
+          min: 0,
+          max: 1,
+          defaultValue: 0.7,
+        ),
+        visualizerTarget: 'envelopeSustain',
+        extractionHints: const <String>[
+          'sustainlevel',
+          'sustain',
+          'envelopesustain',
+          'envelopesustainlevel',
+          'adsrsustain',
+          'adsrsustainlevel',
+          'envsustain',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'releaseTime',
+        range: const ParameterRange(
+          min: 0.01,
+          max: 10,
+          defaultValue: 0.4,
+          curve: ParameterCurve.exponential,
+        ),
+        visualizerTarget: 'envelopeRelease',
+        bridgeAliases: const <String>['release'],
+        extractionHints: const <String>[
+          'releasetime',
+          'enveloperelease',
+          'envelopereleasetime',
+          'adsrrelease',
+          'adsrreleasetime',
+          'envrelease',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'reverbMix',
+        range: const ParameterRange(
+          min: 0,
+          max: 1,
+          defaultValue: 0.25,
+        ),
+        visualizerTarget: 'spaceSize',
+        bridgeAliases: const <String>['reverb'],
+        extractionHints: const <String>[
+          'reverbmix',
+          'fxreverb',
+          'effectsreverbmix',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'delayTime',
+        range: const ParameterRange(
+          min: 0.01,
+          max: 2,
+          defaultValue: 0.25,
+        ),
+        visualizerTarget: 'delayTime',
+        extractionHints: const <String>[
+          'delaytime',
+          'delay',
+          'fxdelaytime',
+          'effectsdelaytime',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'delayFeedback',
+        range: const ParameterRange(
+          min: 0,
+          max: 0.95,
+          defaultValue: 0.2,
+        ),
+        visualizerTarget: 'delayFeedback',
+        extractionHints: const <String>[
+          'delayfeedback',
+          'feedback',
+          'delayfb',
+          'fxdelayfeedback',
+          'effectsdelayfeedback',
+        ],
+      ),
+    );
+
+    _register(
+      ParameterDescriptor(
+        name: 'maxPolyphony',
+        range: ParameterRange(
+          min: 1,
+          max: VoiceAllocator.hardVoiceCeiling.toDouble(),
+          defaultValue: VoiceAllocator.defaultMaxVoices.toDouble(),
+        ),
+        visualizerTarget: 'polyphony',
+        bridgeAliases: const <String>['polyphony', 'voices'],
+        extractionHints: const <String>[
+          'maxpolyphony',
+          'maxvoices',
+        ],
+      ),
+    );
+  }
+
+  static final ParameterRegistry instance = ParameterRegistry._();
+
+  final Map<String, ParameterDescriptor> _descriptors =
+      <String, ParameterDescriptor>{};
+  final Map<String, String> _aliasLookup = <String, String>{};
+
+  /// Exposes a read-only view of the registered descriptors.
+  UnmodifiableMapView<String, ParameterDescriptor> get descriptors =>
+      UnmodifiableMapView<String, ParameterDescriptor>(_descriptors);
+
+  /// Returns every canonical parameter name.
+  List<String> get canonicalNames => _descriptors.keys.toList(growable: false);
+
+  /// Returns the canonical name for [key] if one is registered.
+  String? canonicalName(String key) {
+    return _aliasLookup[_normalise(key)];
+  }
+
+  /// Returns the descriptor for [key] whether a canonical or alias name is
+  /// provided. Returns `null` for unknown parameters.
+  ParameterDescriptor? descriptorFor(String key) {
+    final canonical = canonicalName(key) ?? key;
+    return _descriptors[canonical];
+  }
+
+  /// Returns the default value for [key] or `null` when unknown.
+  double? defaultValue(String key) {
+    return descriptorFor(key)?.range.defaultValue;
+  }
+
+  /// Canonicalises [values] to the engine parameter names, dropping unknown
+  /// entries.
+  Map<String, double> canonicalize(Map<String, double> values) {
+    final canonical = <String, double>{};
+    values.forEach((key, value) {
+      final resolved = canonicalName(key);
+      if (resolved != null) {
+        final descriptor = descriptorFor(resolved);
+        canonical[resolved] = descriptor?.range.clamp(value) ?? value;
+      }
+    });
+    return canonical;
+  }
+
+  /// Expands [canonical] to include bridge aliases for downstream consumers.
+  Map<String, double> expandWithAliases(Map<String, double> canonical) {
+    final expanded = <String, double>{}..addAll(canonical);
+    canonical.forEach((key, value) {
+      final descriptor = descriptorFor(key);
+      if (descriptor == null) {
+        return;
+      }
+      for (final alias in descriptor.bridgeAliases) {
+        expanded[alias] = value;
+      }
+    });
+    return expanded;
+  }
+
+  /// Returns the bridge aliases for [canonical] or an empty list.
+  List<String> bridgeAliases(String canonical) {
+    return List<String>.unmodifiable(
+      descriptorFor(canonical)?.bridgeAliases ?? const <String>[],
+    );
+  }
+
+  /// Normalises [key] by stripping special characters and lower-casing it.
+  static String normalizeKey(String key) => _normalise(key);
+
+  void _register(ParameterDescriptor descriptor) {
+    _descriptors[descriptor.name] = descriptor;
+    for (final key in descriptor.allKeys) {
+      _aliasLookup[_normalise(key)] = descriptor.name;
+    }
+  }
+
+  static String _normalise(String key) {
+    return key.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+}
