@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 /// Central parameter bridge for 3-way synchronization between UI, Audio, and Visualizer
@@ -169,26 +171,37 @@ class ParameterMapping {
       case ParameterCurve.exponential:
         return normalized * normalized;
       case ParameterCurve.logarithmic:
-        return normalized.sign * normalized.abs().log() / 2.3; // ln(10)
+        if (normalized <= 0) {
+          return 0;
+        }
+        return math.log(normalized * 9 + 1) / math.log(10);
     }
   }
   
   // Map normalized value back to real range
   double denormalize(double normalized) {
     double curved;
-    
+
     switch (curve) {
       case ParameterCurve.linear:
-        curved = normalized;
+        final clamped = normalized.clamp(0.0, 1.0).toDouble();
+        curved = clamped;
         break;
       case ParameterCurve.exponential:
-        curved = normalized.sign * normalized.abs().sqrt();
+        final clamped = normalized.clamp(0.0, 1.0).toDouble();
+        curved = math.sqrt(clamped);
         break;
       case ParameterCurve.logarithmic:
-        curved = normalized.sign * (normalized.abs() * 2.3).exp();
+        final clamped = normalized.clamp(0.0, 1.0).toDouble();
+        if (clamped <= 0) {
+          curved = 0;
+        } else {
+          final powValue = math.pow(10, clamped) as num;
+          curved = ((powValue - 1) / 9).toDouble();
+        }
         break;
     }
-    
+
     return min + curved * (max - min);
   }
 }
