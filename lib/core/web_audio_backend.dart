@@ -64,6 +64,7 @@ class WebAudioBackend implements AudioBackend {
   // Scale settings
   int _currentScale = ScaleType.chromatic;
   int _rootNote = 60; // Middle C
+  double _pitchBendSemitones = 0.0;
   
   @override
   bool get isInitialized => _initialized;
@@ -136,6 +137,7 @@ class WebAudioBackend implements AudioBackend {
     voice.oscillatorType = _getOscillatorTypeString(_currentOscType);
     voice.setEnvelope(_adsrAttack, _adsrDecay, _adsrSustain, _adsrRelease);
     voice.connectTo(_filter!);
+    voice.setPitchBend(_pitchBendSemitones);
     voice.start();
     
     _voices[id] = voice;
@@ -156,7 +158,7 @@ class WebAudioBackend implements AudioBackend {
   @override
   void setParameter(int parameterId, double value) {
     if (!_initialized) return;
-    
+
     switch (parameterId) {
       case AudioParameters.masterVolume:
         _masterGain?.gain?.value = value.clamp(0.0, 1.0);
@@ -225,7 +227,15 @@ class WebAudioBackend implements AudioBackend {
         break;
     }
   }
-  
+
+  @override
+  void setPitchBend(double semitoneOffset) {
+    _pitchBendSemitones = semitoneOffset.clamp(-24.0, 24.0);
+    for (final voice in _voices.values) {
+      voice.setPitchBend(_pitchBendSemitones);
+    }
+  }
+
   @override
   double getParameter(int parameterId) {
     switch (parameterId) {
@@ -365,14 +375,16 @@ class WebVoice {
   audio.OscillatorNode? oscillator;
   audio.GainNode? gainNode;
   audio.GainNode? velocityGain;
-  
+
   String _oscillatorType = 'sine';
   bool _started = false;
+  double _pitchBendSemitones = 0.0;
   
   WebVoice(this.context, this.noteNumber, this.velocity) {
     // Create oscillator
     oscillator = context.createOscillator();
-    oscillator!.frequency!.value = _midiToFrequency(noteNumber);
+    oscillator!.frequency!.value =
+        _midiToFrequency(noteNumber + _pitchBendSemitones);
     oscillator!.type = _oscillatorType;
     
     // Create gain nodes
@@ -402,6 +414,14 @@ class WebVoice {
   void connectTo(audio.AudioNode node) {
     velocityGain?.connectNode(node);
   }
+
+  void setPitchBend(double semitones) {
+    _pitchBendSemitones = semitones;
+    if (oscillator != null) {
+      oscillator!.frequency!.value =
+          _midiToFrequency(noteNumber + _pitchBendSemitones);
+    }
+  }
   
   void start() {
     if (_started) return;
@@ -418,7 +438,8 @@ class WebVoice {
       print('Oscillator start failed: $e');
       try {
         oscillator = context.createOscillator();
-        oscillator!.frequency!.value = _midiToFrequency(noteNumber);
+        oscillator!.frequency!.value =
+            _midiToFrequency(noteNumber + _pitchBendSemitones);
         oscillator!.type = _oscillatorType;
         oscillator!.connectNode(gainNode!);
         (oscillator as dynamic).start(now);
@@ -463,7 +484,7 @@ class WebVoice {
     _started = false;
   }
   
-  double _midiToFrequency(int midiNote) {
+  double _midiToFrequency(double midiNote) {
     return 440.0 * math.pow(2.0, (midiNote - 69) / 12.0);
   }
 }
