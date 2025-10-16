@@ -84,5 +84,25 @@ Once your environment is healthy, consult the
 commands that produce Android APKs, desktop builds, or static web bundles that
 can be hosted online.
 
+## 8. Container Reference Setup (October 2025)
+
+When working inside the hosted development shell used for recent refactors, the
+following commands were sufficient to obtain a working Flutter toolchain:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  curl git unzip xz-utils zip libglu1-mesa clang cmake ninja-build \
+  pkg-config libgtk-3-dev
+git clone https://github.com/flutter/flutter.git -b stable /workspace/flutter
+export PATH="/workspace/flutter/bin:$PATH"
+flutter doctor -v
+```
+
+Running `flutter doctor -v` after the installation confirmed that Flutter
+3.35.6, the Linux desktop toolchain, and project dependencies were available.
+The command still flags optional components—Android SDK/Studio and Chrome—for
+teams who intend to target Android or web builds in this environment.
+
 By following these steps you will have the complete toolchain required to work
 on the Flutter and Dart portions of the project.

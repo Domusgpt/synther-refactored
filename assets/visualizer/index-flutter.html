@@ -65,6 +65,206 @@
         .hidden {
             display: none !important;
         }
+
+        .overlay {
+            position: absolute;
+            z-index: 5;
+            color: #ffffff;
+            font-family: 'Space Mono', monospace;
+        }
+
+        #vib-top-bar {
+            top: 18px;
+            left: 24px;
+            right: 24px;
+            height: 58px;
+            padding: 12px 18px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: linear-gradient(135deg, rgba(5, 12, 40, 0.82), rgba(28, 9, 60, 0.68));
+            border: 1px solid rgba(0, 255, 255, 0.35);
+            box-shadow: 0 12px 28px rgba(0, 255, 255, 0.08);
+            backdrop-filter: blur(18px);
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+
+        #vib-top-bar .logo {
+            font-size: 13px;
+            letter-spacing: 4px;
+            font-weight: 600;
+            color: #54fff4;
+        }
+
+        .vib-pill {
+            padding: 8px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(0, 0, 0, 0.35);
+            font-size: 10px;
+            letter-spacing: 1.6px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        #vib-top-bar.hidden {
+            opacity: 0;
+            transform: translateY(-12px);
+            pointer-events: none;
+        }
+
+        #vib-metrics-panel {
+            top: 96px;
+            right: 24px;
+            width: 280px;
+            padding: 20px 18px;
+            border-radius: 24px;
+            background: linear-gradient(180deg, rgba(12, 4, 36, 0.82), rgba(8, 2, 24, 0.78));
+            border: 1px solid rgba(156, 108, 255, 0.35);
+            box-shadow: 0 18px 36px rgba(156, 108, 255, 0.14);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+
+        #vib-metrics-panel.hidden {
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+        }
+
+        #vib-metrics-panel .panel-title {
+            font-size: 12px;
+            letter-spacing: 1.8px;
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        .vib-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .vib-metric .metric-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            letter-spacing: 1.4px;
+            color: rgba(255, 255, 255, 0.72);
+        }
+
+        .vib-metric .metric-bar {
+            width: 100%;
+            height: 6px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.12);
+            overflow: hidden;
+        }
+
+        .vib-metric .metric-bar .fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.25s ease;
+        }
+
+        .vib-metric .metric-caption {
+            font-size: 10px;
+            letter-spacing: 1.2px;
+            color: rgba(255, 255, 255, 0.42);
+        }
+
+        .vib-metric.accent-cyan .fill {
+            background: linear-gradient(90deg, rgba(84, 255, 244, 0.95), rgba(0, 200, 255, 0.95));
+        }
+
+        .vib-metric.accent-magenta .fill {
+            background: linear-gradient(90deg, rgba(255, 79, 216, 0.95), rgba(255, 147, 225, 0.95));
+        }
+
+        .vib-metric.accent-blue .fill {
+            background: linear-gradient(90deg, rgba(45, 230, 255, 0.95), rgba(84, 195, 255, 0.95));
+        }
+
+        .vib-metric.accent-violet .fill {
+            background: linear-gradient(90deg, rgba(156, 108, 255, 0.95), rgba(122, 82, 255, 0.95));
+        }
+
+        .vib-metric.accent-amber .fill {
+            background: linear-gradient(90deg, rgba(255, 200, 97, 0.95), rgba(255, 166, 90, 0.95));
+        }
+
+        .vib-metric.accent-green .fill {
+            background: linear-gradient(90deg, rgba(50, 255, 132, 0.95), rgba(0, 220, 125, 0.95));
+        }
+
+        #vib-status-badge {
+            left: 24px;
+            bottom: 24px;
+            padding: 18px 22px;
+            border-radius: 20px;
+            border: 1px solid rgba(84, 255, 244, 0.32);
+            background: rgba(0, 0, 0, 0.55);
+            box-shadow: 0 18px 30px rgba(0, 255, 255, 0.08);
+            backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: opacity 0.35s ease, transform 0.35s ease, border-color 0.25s ease;
+        }
+
+        #vib-status-badge.hidden {
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+        }
+
+        #vib-status-badge .badge-label {
+            font-size: 10px;
+            letter-spacing: 1.8px;
+            color: rgba(255, 255, 255, 0.62);
+        }
+
+        #vib-status-badge .badge-value {
+            font-size: 16px;
+            letter-spacing: 3px;
+            color: #54fff4;
+            font-weight: 700;
+        }
+
+        #vib-status-badge .badge-caption {
+            font-size: 10px;
+            letter-spacing: 1.3px;
+            color: rgba(255, 255, 255, 0.45);
+        }
+
+        #vib-status-badge.active {
+            border-color: rgba(255, 79, 216, 0.6);
+            box-shadow: 0 22px 40px rgba(255, 79, 216, 0.18);
+        }
+
+        #vib-status-badge.active .badge-value {
+            color: #ff4fd8;
+        }
+
+        @media (max-width: 720px) {
+            #vib-metrics-panel {
+                width: calc(100% - 48px);
+                right: 24px;
+                left: 24px;
+                top: auto;
+                bottom: 96px;
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 16px;
+            }
+
+            #vib-metrics-panel .vib-metric {
+                width: calc(50% - 12px);
+            }
+        }
     </style>
 </head>
 <body>
@@ -75,6 +275,71 @@
         </div>
         
         <canvas id="visualization-canvas"></canvas>
+
+        <div id="vib-top-bar" class="overlay hidden">
+            <div class="logo">VIB34D SPECTRAL ENGINE</div>
+            <div class="vib-pill" id="top-master">MASTER 0%</div>
+            <div class="vib-pill" id="top-lfo">LFO 0HZ</div>
+            <div class="vib-pill" id="top-granular">GRAINS 0%</div>
+        </div>
+
+        <div id="vib-metrics-panel" class="overlay hidden">
+            <div class="panel-title">REALTIME METRICS</div>
+            <div class="vib-metric accent-cyan" id="metric-voices">
+                <div class="metric-header">
+                    <span>ACTIVE VOICES</span>
+                    <span id="metric-voices-value">0</span>
+                </div>
+                <div class="metric-bar"><div class="fill" id="metric-voices-bar"></div></div>
+                <div class="metric-caption" id="metric-voices-caption">of 0 voices</div>
+            </div>
+            <div class="vib-metric accent-magenta" id="metric-performance">
+                <div class="metric-header">
+                    <span>PERFORMANCE ENERGY</span>
+                    <span id="metric-performance-value">0%</span>
+                </div>
+                <div class="metric-bar"><div class="fill" id="metric-performance-bar"></div></div>
+                <div class="metric-caption" id="metric-performance-caption"></div>
+            </div>
+            <div class="vib-metric accent-blue" id="metric-modulation">
+                <div class="metric-header">
+                    <span>MOD MATRIX</span>
+                    <span id="metric-modulation-value">0%</span>
+                </div>
+                <div class="metric-bar"><div class="fill" id="metric-modulation-bar"></div></div>
+                <div class="metric-caption" id="metric-modulation-caption"></div>
+            </div>
+            <div class="vib-metric accent-violet" id="metric-filter">
+                <div class="metric-header">
+                    <span>FILTER SPECTRUM</span>
+                    <span id="metric-filter-value">0 Hz</span>
+                </div>
+                <div class="metric-bar"><div class="fill" id="metric-filter-bar"></div></div>
+                <div class="metric-caption" id="metric-filter-caption"></div>
+            </div>
+            <div class="vib-metric accent-amber" id="metric-granular">
+                <div class="metric-header">
+                    <span>GRANULAR MOTION</span>
+                    <span id="metric-granular-value">0%</span>
+                </div>
+                <div class="metric-bar"><div class="fill" id="metric-granular-bar"></div></div>
+                <div class="metric-caption" id="metric-granular-caption"></div>
+            </div>
+            <div class="vib-metric accent-green" id="metric-sustain">
+                <div class="metric-header">
+                    <span>SUSTAIN STATE</span>
+                    <span id="metric-sustain-value">IDLE</span>
+                </div>
+                <div class="metric-bar"><div class="fill" id="metric-sustain-bar"></div></div>
+                <div class="metric-caption" id="metric-sustain-caption"></div>
+            </div>
+        </div>
+
+        <div id="vib-status-badge" class="overlay hidden">
+            <div class="badge-label">VISUALIZER LINK</div>
+            <div class="badge-value" id="badge-sync-value">CONNECTING</div>
+            <div class="badge-caption" id="badge-sync-caption">Awaiting audio handshake</div>
+        </div>
     </div>
     
     <!-- Import existing HyperAV visualizer modules -->
@@ -151,10 +416,23 @@
                 // Start rendering
                 window.hyperAVState.core.start();
                 window.hyperAVState.isInitialized = true;
-                
+
                 // Hide loading screen
                 document.getElementById('loading').classList.add('hidden');
-                
+
+                const topBar = document.getElementById('vib-top-bar');
+                if (topBar) topBar.classList.remove('hidden');
+                const metricsPanel = document.getElementById('vib-metrics-panel');
+                if (metricsPanel) metricsPanel.classList.remove('hidden');
+                const statusBadge = document.getElementById('vib-status-badge');
+                if (statusBadge) {
+                    statusBadge.classList.remove('hidden');
+                    const badgeValue = document.getElementById('badge-sync-value');
+                    const badgeCaption = document.getElementById('badge-sync-caption');
+                    if (badgeValue) badgeValue.textContent = 'ONLINE';
+                    if (badgeCaption) badgeCaption.textContent = 'Listening for audio data';
+                }
+
                 console.log('🎨 HyperAV 4D Visualizer initialized');
                 return true;
                 
@@ -167,24 +445,134 @@
         // Update audio data from Flutter
         window.updateAudioData = function(data) {
             if (!window.hyperAVState.isInitialized || !window.hyperAVState.core) return;
-            
+
+            const clamp01 = (value) => {
+                if (typeof value !== 'number' || !isFinite(value)) return 0;
+                return Math.min(1, Math.max(0, value));
+            };
+
+            const numeric = (value, fallback = 0) => {
+                return (typeof value === 'number' && isFinite(value)) ? value : fallback;
+            };
+
+            const amplitude = numeric(data.amplitude, 0);
+
             // Map Flutter audio data to HyperAV parameters
             const audioLevels = {
-                bass: data.amplitude * 0.8 || 0,
-                mid: data.amplitude * 0.6 || 0,
-                high: data.amplitude * 0.4 || 0
+                bass: amplitude * 0.8,
+                mid: amplitude * 0.6,
+                high: amplitude * 0.4,
             };
-            
-            // Update visualizer with audio data
+
             window.hyperAVState.core.updateParameters({
                 audioLevels: audioLevels,
-                morphFactor: 0.5 + (data.amplitude || 0) * 0.3,
-                rotationSpeed: 0.2 + (data.frequency - 440) / 2000,
-                glitchIntensity: data.filterResonance * 0.5 || 0,
-                colorShift: (data.filterCutoff - 1000) / 10000 || 0
+                morphFactor: 0.5 + amplitude * 0.3,
+                rotationSpeed: 0.2 + (numeric(data.frequency, 440) - 440) / 2000,
+                glitchIntensity: numeric(data.filterResonance, 0) * 0.5,
+                colorShift: (numeric(data.filterCutoff, 1000) - 1000) / 10000,
             });
-            
-            // Store for reference
+
+            const topMaster = document.getElementById('top-master');
+            if (topMaster) {
+                const master = clamp01(numeric(data.masterVolume, 0));
+                topMaster.textContent = `MASTER ${Math.round(master * 100)}%`;
+            }
+
+            const topLfo = document.getElementById('top-lfo');
+            if (topLfo) {
+                const lfoRate = numeric(data.lfoRate, 0);
+                topLfo.textContent = `LFO ${lfoRate.toFixed(2)}Hz`;
+            }
+
+            const topGranular = document.getElementById('top-granular');
+            if (topGranular) {
+                const granular = clamp01(numeric(data.granularMotion, 0));
+                topGranular.textContent = `GRAINS ${Math.round(granular * 100)}%`;
+            }
+
+            const updateMetric = (prefix, valueText, captionText, progressValue) => {
+                const valueNode = document.getElementById(`${prefix}-value`);
+                if (valueNode && typeof valueText === 'string') {
+                    valueNode.textContent = valueText;
+                }
+                const captionNode = document.getElementById(`${prefix}-caption`);
+                if (captionNode && typeof captionText === 'string') {
+                    captionNode.textContent = captionText;
+                }
+                const barNode = document.getElementById(`${prefix}-bar`);
+                if (barNode) {
+                    const safe = clamp01(progressValue ?? 0);
+                    barNode.style.width = `${(safe * 100).toFixed(1)}%`;
+                }
+            };
+
+            const voices = numeric(data.activeVoices, 0);
+            const maxVoices = Math.max(1, numeric(data.maxPolyphony, 1));
+            updateMetric(
+                'metric-voices',
+                voices.toFixed(0),
+                `of ${maxVoices.toFixed(0)} voices`,
+                voices / maxVoices,
+            );
+
+            const performance = clamp01(numeric(data.performanceEnergy, 0));
+            updateMetric(
+                'metric-performance',
+                `${Math.round(performance * 100)}%`,
+                'Performance modulation blend',
+                performance,
+            );
+
+            const modulation = clamp01(numeric(data.modulationEnergy, 0));
+            updateMetric(
+                'metric-modulation',
+                `${Math.round(modulation * 100)}%`,
+                'Active modulation routes',
+                modulation,
+            );
+
+            const cutoff = numeric(data.filterCutoff, 0);
+            const cutoffMin = 20;
+            const cutoffMax = 20000;
+            const cutoffNorm = clamp01((cutoff - cutoffMin) / (cutoffMax - cutoffMin));
+            updateMetric(
+                'metric-filter',
+                `${Math.round(cutoff)} Hz`,
+                'Cutoff position across spectrum',
+                cutoffNorm,
+            );
+
+            const granularMotion = clamp01(numeric(data.granularMotion, 0));
+            updateMetric(
+                'metric-granular',
+                `${Math.round(granularMotion * 100)}%`,
+                'Grain movement & variation',
+                granularMotion,
+            );
+
+            const sustainActive = clamp01(numeric(data.sustainActive, 0));
+            updateMetric(
+                'metric-sustain',
+                sustainActive >= 0.5 ? 'HELD' : 'IDLE',
+                sustainActive >= 0.5 ? 'Pedal engaged' : 'Pedal released',
+                sustainActive,
+            );
+
+            const statusBadge = document.getElementById('vib-status-badge');
+            const badgeValue = document.getElementById('badge-sync-value');
+            const badgeCaption = document.getElementById('badge-sync-caption');
+            if (statusBadge && badgeValue && badgeCaption) {
+                if (voices > 0) {
+                    statusBadge.classList.add('active');
+                    badgeValue.textContent = 'RESPONDING';
+                    badgeCaption.textContent = `${voices.toFixed(0)} voices engaged`;
+                } else {
+                    statusBadge.classList.remove('active');
+                    badgeValue.textContent = 'STANDBY';
+                    badgeCaption.textContent = 'Awaiting note input';
+                }
+            }
+
             window.hyperAVState.audioData = data;
         };
         
