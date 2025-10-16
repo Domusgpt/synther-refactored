@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import '../core/audio_engine.dart';
 import '../visualizer/hypercube_visualizer.dart';
 import 'holographic_widgets.dart';
+import 'modulation_matrix_panel.dart';
 
 /// Revolutionary Vaporwave Holographic Interface
 /// 
@@ -334,7 +335,7 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
       right: 20,
       child: GlassmorphicContainer(
         width: 200,
-        height: 100,
+        height: 150,
         borderRadius: 15,
         blur: 20,
         alignment: Alignment.center,
@@ -359,10 +360,41 @@ class _VaporwaveInterfaceState extends State<VaporwaveInterface>
               _buildStatusText('ENGINE', audioEngine.isInitialized ? 'ACTIVE' : 'OFFLINE'),
               _buildStatusText('LATENCY', '3.2ms'),
               _buildStatusText('4D MODE', 'HYPERCUBE'),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0x3300FFFF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  onPressed: () => _openModulationMatrixPanel(audioEngine),
+                  child: const Text('MOD MATRIX'),
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _openModulationMatrixPanel(AudioEngine audioEngine) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ChangeNotifierProvider.value(
+          value: audioEngine,
+          child: const ModulationMatrixPanel(),
+        );
+      },
     );
   }
   
