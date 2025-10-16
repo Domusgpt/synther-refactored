@@ -2,5 +2,7 @@
 *.g.dart
 *.freezed.dart
 .dart_tool/
+.tooling/
+.flutter-plugins-dependencies
 build/
 *.lock
