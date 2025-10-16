@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/synth_parameters.dart';
 import '../core/audio_backend.dart';
@@ -21,20 +22,94 @@ class AudioUISyncManager {
   // Parameter update queue for thread-safe updates
   final List<ParameterUpdate> _updateQueue = [];
   Timer? _updateTimer;
-  
+  Timer? _statusTimer;
+  AudioBackend? _boundBackend;
+
   // Initialize monitoring
   void initialize(AudioBackend engine) {
-    // Start periodic status check
-    Timer.periodic(const Duration(milliseconds: 100), (_) {
+    if (identical(_boundBackend, engine)) {
+      return;
+    }
+
+    _statusTimer?.cancel();
+    _boundBackend = engine;
+
+    final isInitialized = engine.isInitialized;
+    _isAudioInitialized = isInitialized;
+
+    if (_engineStatus != AudioEngineStatus.error) {
+      _engineStatus = isInitialized
+          ? AudioEngineStatus.running
+          : AudioEngineStatus.initializing;
+    }
+
+    _notifyStatusListeners();
+
+    _statusTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!identical(_boundBackend, engine)) {
+        return;
+      }
       _checkEngineStatus(engine);
     });
+
+    _checkEngineStatus(engine);
   }
-  
+
+  void detach(AudioBackend engine) {
+    if (!identical(_boundBackend, engine)) {
+      return;
+    }
+
+    _statusTimer?.cancel();
+    _statusTimer = null;
+
+    _updateTimer?.cancel();
+    _updateTimer = null;
+    _updateQueue.clear();
+
+    _boundBackend = null;
+    _isAudioInitialized = false;
+
+    if (_engineStatus != AudioEngineStatus.error) {
+      _engineStatus = AudioEngineStatus.uninitialized;
+    }
+
+    _notifyStatusListeners();
+  }
+
+  @visibleForTesting
+  void resetForTesting() {
+    final backend = _boundBackend;
+    if (backend != null) {
+      detach(backend);
+    } else {
+      _statusTimer?.cancel();
+      _statusTimer = null;
+      _updateTimer?.cancel();
+      _updateTimer = null;
+      _updateQueue.clear();
+    }
+
+    _statusListeners.clear();
+    _lastError = null;
+    _engineStatus = AudioEngineStatus.uninitialized;
+    _isAudioInitialized = false;
+  }
+
   void _checkEngineStatus(AudioBackend engine) {
-    final wasInitialized = _isAudioInitialized;
+    final previousInitialized = _isAudioInitialized;
+    final previousStatus = _engineStatus;
+
     _isAudioInitialized = engine.isInitialized;
-    
-    if (wasInitialized != _isAudioInitialized) {
+
+    if (_engineStatus != AudioEngineStatus.error) {
+      _engineStatus = _isAudioInitialized
+          ? AudioEngineStatus.running
+          : AudioEngineStatus.initializing;
+    }
+
+    if (previousInitialized != _isAudioInitialized ||
+        previousStatus != _engineStatus) {
       _notifyStatusListeners();
     }
   }
@@ -43,23 +118,34 @@ class AudioUISyncManager {
   void queueParameterUpdate(int parameterId, double value) {
     _updateQueue.add(ParameterUpdate(parameterId, value));
     
+    if (_boundBackend == null) {
+      return;
+    }
+
     // Process queue on next frame
     _updateTimer?.cancel();
     _updateTimer = Timer(Duration.zero, _processUpdateQueue);
   }
-  
+
   void _processUpdateQueue() {
     if (_updateQueue.isEmpty) return;
-    
+
     // Process all queued updates
     final updates = List<ParameterUpdate>.from(_updateQueue);
     _updateQueue.clear();
-    
+
+    final backend = _boundBackend;
+    if (backend == null) {
+      _updateTimer = null;
+      return;
+    }
+
     // Apply updates in batch
     for (final update in updates) {
-      // This would be sent to audio thread
-      debugPrint('Audio update: param ${update.parameterId} = ${update.value}');
+      backend.setParameter(update.parameterId, update.value);
     }
+
+    _updateTimer = null;
   }
   
   // Status listeners
@@ -91,7 +177,9 @@ class AudioUISyncManager {
   
   void clearError() {
     _lastError = null;
-    _engineStatus = AudioEngineStatus.running;
+    _engineStatus = _isAudioInitialized
+        ? AudioEngineStatus.running
+        : AudioEngineStatus.initializing;
     _notifyStatusListeners();
   }
 }
