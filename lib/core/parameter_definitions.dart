@@ -13,7 +13,11 @@ class SynthParameterId {
   static const int oscillatorPanning = 4;
   static const int oscillatorFineTune = 5;
   static const int oscillatorPulseWidth = 6;
-  
+
+  // LFO parameters
+  static const int lfoRate = 7;
+  static const int lfoDepth = 8;
+
   // Filter parameters
   static const int filterCutoff = 10;
   static const int filterResonance = 11;
@@ -29,7 +33,25 @@ class SynthParameterId {
   static const int reverbMix = 30;
   static const int delayTime = 31;
   static const int delayFeedback = 32;
-  
+  static const int oscillatorBlend = 33;
+  static const int oscillatorDetune = 34;
+  static const int oscillatorSpread = 35;
+  static const int distortionDrive = 36;
+  static const int chorusRate = 37;
+  static const int chorusDepth = 38;
+  static const int glideTime = 39;
+
+  // Performance parameters
+  static const int pitchBendRange = 71;
+  static const int modWheel = 72;
+  static const int channelAftertouch = 73;
+  static const int expression = 74;
+  static const int sustainPedal = 75;
+  static const int macro1 = 76;
+  static const int macro2 = 77;
+  static const int macro3 = 78;
+  static const int macro4 = 79;
+
   // Granular parameters
   static const int granularActive = 40;
   static const int granularGrainRate = 41;
