@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/audio_engine.dart';
 import '../core/modulation_matrix.dart';
+import '../core/modulation_metadata.dart';
 
 class ModulationMatrixPanel extends StatefulWidget {
   const ModulationMatrixPanel({super.key});
@@ -20,14 +21,11 @@ class _ModulationMatrixPanelState extends State<ModulationMatrixPanel> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final engine = Provider.of<AudioEngine>(context, listen: false);
-    _selectedSource ??=
-        engine.availableModulationSources.isNotEmpty
-            ? engine.availableModulationSources.first
-            : null;
+    final sources = engine.modulationSourceDescriptors;
+    final destinations = engine.modulationDestinationDescriptors;
+    _selectedSource ??= sources.isNotEmpty ? sources.first.id : null;
     _selectedDestination ??=
-        engine.availableModulationDestinations.isNotEmpty
-            ? engine.availableModulationDestinations.first
-            : null;
+        destinations.isNotEmpty ? destinations.first.id : null;
   }
 
   @override
@@ -66,8 +64,14 @@ class _ModulationMatrixPanelState extends State<ModulationMatrixPanel> {
           child: Consumer<AudioEngine>(
             builder: (context, engine, _) {
               final routes = engine.modulationRoutes;
-              final sources = engine.availableModulationSources;
-              final destinations = engine.availableModulationDestinations;
+              final sourceDescriptors = engine.modulationSourceDescriptors;
+              final destinationDescriptors =
+                  engine.modulationDestinationDescriptors;
+              final sourceIds =
+                  sourceDescriptors.map((descriptor) => descriptor.id).toList();
+              final destinationIds = destinationDescriptors
+                  .map((descriptor) => descriptor.id)
+                  .toList();
               final depthBySource = engine.modulationDepthBySource;
               final depthByDestination = engine.modulationDepthByDestination;
 
@@ -131,8 +135,10 @@ class _ModulationMatrixPanelState extends State<ModulationMatrixPanel> {
                   _buildAddRouteCard(
                     engine: engine,
                     colorScheme: colorScheme,
-                    sources: sources,
-                    destinations: destinations,
+                    sourceDescriptors: sourceDescriptors,
+                    destinationDescriptors: destinationDescriptors,
+                    sourceIds: sourceIds,
+                    destinationIds: destinationIds,
                   ),
                 ],
               );
@@ -191,7 +197,8 @@ for evolving textures.',
             children: [
               Expanded(
                 child: Text(
-                  '${_formatKey(route.source)} → ${_formatKey(route.destination)}',
+                  '${ModulationRoutingMetadata.labelForSource(route.source)} → '
+                  '${ModulationRoutingMetadata.labelForDestination(route.destination)}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -254,8 +261,10 @@ for evolving textures.',
   Widget _buildAddRouteCard({
     required AudioEngine engine,
     required ColorScheme colorScheme,
-    required List<String> sources,
-    required List<String> destinations,
+    required List<ModulationSourceDescriptor> sourceDescriptors,
+    required List<ModulationDestinationDescriptor> destinationDescriptors,
+    required List<String> sourceIds,
+    required List<String> destinationIds,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -279,12 +288,15 @@ for evolving textures.',
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: sources.contains(_selectedSource) ? _selectedSource : null,
-                  items: sources
+                  value: sourceIds.contains(_selectedSource) ? _selectedSource : null,
+                  items: sourceDescriptors
                       .map(
-                        (source) => DropdownMenuItem<String>(
-                          value: source,
-                          child: Text(_formatKey(source)),
+                        (descriptor) => DropdownMenuItem<String>(
+                          value: descriptor.id,
+                          child: _DropdownLabel(
+                            title: descriptor.label,
+                            subtitle: descriptor.description,
+                          ),
                         ),
                       )
                       .toList(),
@@ -295,19 +307,23 @@ for evolving textures.',
                   ),
                   dropdownColor: const Color(0xFF111327),
                   style: const TextStyle(color: Colors.white),
+                  isDense: true,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: destinations.contains(_selectedDestination)
+                  value: destinationIds.contains(_selectedDestination)
                       ? _selectedDestination
                       : null,
-                  items: destinations
+                  items: destinationDescriptors
                       .map(
-                        (destination) => DropdownMenuItem<String>(
-                          value: destination,
-                          child: Text(_formatKey(destination)),
+                        (descriptor) => DropdownMenuItem<String>(
+                          value: descriptor.id,
+                          child: _DropdownLabel(
+                            title: descriptor.label,
+                            subtitle: descriptor.description,
+                          ),
                         ),
                       )
                       .toList(),
@@ -318,6 +334,7 @@ for evolving textures.',
                   ),
                   dropdownColor: const Color(0xFF111327),
                   style: const TextStyle(color: Colors.white),
+                  isDense: true,
                 ),
               ),
             ],
@@ -406,38 +423,12 @@ for evolving textures.',
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${_formatKey(source)} now modulates ${_formatKey(destination)}'),
+        content: Text(
+          '${ModulationRoutingMetadata.labelForSource(source)} now modulates '
+          '${ModulationRoutingMetadata.labelForDestination(destination)}',
+        ),
       ),
     );
-  }
-
-  String _formatKey(String raw) {
-    if (raw.isEmpty) {
-      return raw;
-    }
-
-    final buffer = StringBuffer();
-    final cleaned = raw
-        .replaceAll(RegExp(r'[._-]+'), ' ')
-        .replaceAllMapped(RegExp(r'([a-z0-9])([A-Z])'), (match) => '${match[1]} ${match[2]}')
-        .replaceAllMapped(RegExp(r'([A-Za-z])(\d)'), (match) => '${match[1]} ${match[2]}');
-
-    final parts = cleaned.split(RegExp(r'\s+'));
-    for (var i = 0; i < parts.length; i++) {
-      final part = parts[i];
-      if (part.isEmpty) {
-        continue;
-      }
-      if (buffer.isNotEmpty) {
-        buffer.write(' ');
-      }
-      buffer.write(part[0].toUpperCase());
-      if (part.length > 1) {
-        buffer.write(part.substring(1).toLowerCase());
-      }
-    }
-
-    return buffer.toString();
   }
 }
 
@@ -460,6 +451,7 @@ class _ModulationSummary extends StatelessWidget {
             context,
             label: 'Source activity',
             entries: sourceTotals,
+            labelFormatter: ModulationRoutingMetadata.labelForSource,
           ),
         if (destinationTotals.isNotEmpty)
           Padding(
@@ -468,6 +460,7 @@ class _ModulationSummary extends StatelessWidget {
               context,
               label: 'Destination depth',
               entries: destinationTotals,
+              labelFormatter: ModulationRoutingMetadata.labelForDestination,
             ),
           ),
       ],
@@ -478,6 +471,7 @@ class _ModulationSummary extends StatelessWidget {
     BuildContext context, {
     required String label,
     required Map<String, double> entries,
+    required String Function(String) labelFormatter,
   }) {
     final sortedEntries = entries.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -500,7 +494,7 @@ class _ModulationSummary extends StatelessWidget {
                 (entry) => Chip(
                   backgroundColor: const Color(0xFF1A1D39),
                   label: Text(
-                    '${_formatKey(entry.key)} ${entry.value.toStringAsFixed(2)}',
+                    '${labelFormatter(entry.key)} ${entry.value.toStringAsFixed(2)}',
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                   ),
                 ),
@@ -510,33 +504,36 @@ class _ModulationSummary extends StatelessWidget {
       ],
     );
   }
+}
 
-  String _formatKey(String raw) {
-    if (raw.isEmpty) {
-      return raw;
-    }
+class _DropdownLabel extends StatelessWidget {
+  const _DropdownLabel({
+    required this.title,
+    this.subtitle,
+  });
 
-    final buffer = StringBuffer();
-    final cleaned = raw
-        .replaceAll(RegExp(r'[._-]+'), ' ')
-        .replaceAllMapped(RegExp(r'([a-z0-9])([A-Z])'), (match) => '${match[1]} ${match[2]}')
-        .replaceAllMapped(RegExp(r'([A-Za-z])(\d)'), (match) => '${match[1]} ${match[2]}');
+  final String title;
+  final String? subtitle;
 
-    final parts = cleaned.split(RegExp(r'\s+'));
-    for (var i = 0; i < parts.length; i++) {
-      final part = parts[i];
-      if (part.isEmpty) {
-        continue;
-      }
-      if (buffer.isNotEmpty) {
-        buffer.write(' ');
-      }
-      buffer.write(part[0].toUpperCase());
-      if (part.length > 1) {
-        buffer.write(part.substring(1).toLowerCase());
-      }
-    }
-
-    return buffer.toString();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(title, style: const TextStyle(color: Colors.white)),
+        if (subtitle != null && subtitle!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              subtitle!,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
