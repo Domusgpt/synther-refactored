@@ -372,6 +372,28 @@ class AudioEngine extends ChangeNotifier {
   double get transportPositionBeats => _transportPositionBeats;
   List<ModulationRoute> get modulationRoutes => _modulationMatrix.routes;
 
+  /// Rich metadata describing the modulation sources the UI can present.
+  List<ModulationSourceDescriptor> get modulationSourceDescriptors =>
+      ModulationRoutingMetadata.sourceDescriptors;
+
+  /// Metadata describing curated modulation destinations for UI presentation.
+  List<ModulationDestinationDescriptor> get modulationDestinationDescriptors =>
+      ModulationRoutingMetadata.destinationDescriptors;
+
+  /// Curated modulation route suggestions for quick UI affordances.
+  List<ModulationRouteSuggestion> get modulationRouteSuggestions =>
+      ModulationRoutingMetadata.suggestedRoutes();
+
+  /// Returns modulation suggestions filtered by optional categories.
+  List<ModulationRouteSuggestion> suggestedModulationRoutes({
+    String? sourceCategory,
+    String? destinationCategory,
+  }) =>
+      ModulationRoutingMetadata.suggestedRoutes(
+        sourceCategory: sourceCategory,
+        destinationCategory: destinationCategory,
+      );
+
   /// Curated list of modulation sources the UI should expose.
   List<String> get availableModulationSources =>
       ModulationRoutingMetadata.availableSources;

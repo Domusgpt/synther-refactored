@@ -1,0 +1,24 @@
+# Development Log
+
+## Turn 1 – Bootstrap workflow
+- Added `tool/bootstrap_and_test.sh` to install the Flutter toolchain via the existing setup script and then run analysis/tests for quick validation cycles.
+- Documented the bootstrap workflow alongside other common project commands in the README.
+
+## Turn 2 – Modulation descriptors
+- Introduced rich modulation source and destination descriptors with categories, descriptions, aliases, and helper lookups for UI presentation.
+- Surfaced the curated metadata through `AudioEngine` and refreshed the modulation matrix panel to render friendlier dropdown entries and summaries.
+
+## Turn 3 – Searchable modulation matrix
+- Added token-based metadata search helpers for curated modulation sources and destinations.
+- Replaced matrix panel dropdowns with searchable autocompletes, contextual category chips, and descriptor insights for selected and active modulation routes.
+- Expanded metadata-focused tests to cover the new search behaviour.
+
+## Turn 4 – Category-focused routing filters
+- Added reusable helpers that expose curated source and destination categories in presentation order.
+- Introduced category filter chips to the modulation matrix panel for targeting sources and destinations, including automatic selection management when filters change.
+- Extended metadata tests to validate the category helper behaviour.
+
+## Turn 5 – Suggested modulation recipes
+- Curated a reusable catalogue of modulation route suggestions with categories, labels, and recommended amounts for guided workflows.
+- Surfaced quick-add suggestion chips in the modulation matrix panel that apply the curated routes and update filters automatically.
+- Expanded metadata and audio engine tests to cover the new suggestion helpers and filtered retrieval.
