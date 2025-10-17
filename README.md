@@ -129,11 +129,13 @@ native/                  # Placeholder for future native backends (optional)
 ### Common Commands
 
 ```bash
-flutter run            # Launch the application on a connected device or emulator
-flutter test           # Execute widget and unit tests
-flutter analyze        # Static analysis using Flutter’s linter rules
-dart format lib test   # Apply automatic formatting
-tool/capture_ui_snapshot.sh  # Produce deterministic UI screenshots for QA
+flutter run                  # Launch the application on a connected device or emulator
+flutter test                 # Execute widget and unit tests
+flutter analyze              # Static analysis using Flutter’s linter rules
+dart format lib test         # Apply automatic formatting
+tool/setup_dev_environment.sh      # Bootstrap Flutter SDK & dependencies
+tool/bootstrap_and_test.sh         # Full bootstrap + analyze + test cycle
+tool/capture_ui_snapshot.sh        # Produce deterministic UI screenshots for QA
 ```
 
 > **Tip:** Add the Flutter extension (VS Code) or the Flutter/ Dart plugins
