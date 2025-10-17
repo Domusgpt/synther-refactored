@@ -7,6 +7,7 @@ import 'package:synther_holographic_pro/core/basic_audio_backend.dart';
 import 'package:synther_holographic_pro/core/parameter_bridge.dart';
 import 'package:synther_holographic_pro/core/parameter_definitions.dart';
 import 'package:synther_holographic_pro/core/modulation_matrix.dart';
+import 'package:synther_holographic_pro/core/modulation_metadata.dart';
 import 'package:synther_holographic_pro/core/synth_preset.dart';
 import 'package:synther_holographic_pro/core/voice_allocator.dart';
 import 'package:synther_holographic_pro/core/preset_setlist.dart';
@@ -1177,6 +1178,24 @@ void main() {
 
       expect(engine.availableModulationSources, contains('modWheel'));
       expect(engine.availableModulationDestinations, contains('filterCutoff'));
+      expect(
+        engine.modulationSourceDescriptors
+            .where((descriptor) => descriptor.id == 'modWheel')
+            .single
+            .category,
+        'Performance',
+      );
+      expect(
+        engine.modulationDestinationDescriptors
+            .where((descriptor) => descriptor.id == 'filterCutoff')
+            .single
+            .category,
+        'Filter',
+      );
+      expect(
+        ModulationRoutingMetadata.labelForSource('aftertouch'),
+        'Channel Aftertouch',
+      );
 
       engine.setModulationRoute(
         const ModulationRoute(
