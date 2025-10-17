@@ -7,6 +7,7 @@ import 'package:synther_holographic_pro/core/basic_audio_backend.dart';
 import 'package:synther_holographic_pro/core/parameter_bridge.dart';
 import 'package:synther_holographic_pro/core/parameter_definitions.dart';
 import 'package:synther_holographic_pro/core/modulation_matrix.dart';
+import 'package:synther_holographic_pro/core/modulation_metadata.dart';
 import 'package:synther_holographic_pro/core/synth_preset.dart';
 import 'package:synther_holographic_pro/core/voice_allocator.dart';
 import 'package:synther_holographic_pro/core/preset_setlist.dart';
@@ -1177,6 +1178,24 @@ void main() {
 
       expect(engine.availableModulationSources, contains('modWheel'));
       expect(engine.availableModulationDestinations, contains('filterCutoff'));
+      expect(
+        engine.modulationSourceDescriptors
+            .where((descriptor) => descriptor.id == 'modWheel')
+            .single
+            .category,
+        'Performance',
+      );
+      expect(
+        engine.modulationDestinationDescriptors
+            .where((descriptor) => descriptor.id == 'filterCutoff')
+            .single
+            .category,
+        'Filter',
+      );
+      expect(
+        ModulationRoutingMetadata.labelForSource('aftertouch'),
+        'Channel Aftertouch',
+      );
 
       engine.setModulationRoute(
         const ModulationRoute(
@@ -1200,6 +1219,43 @@ void main() {
       expect(sourceTotals['expression'], closeTo(0.25, 1e-9));
       expect(destinationTotals['filterCutoff'], closeTo(0.5, 1e-9));
       expect(destinationTotals['distortionDrive'], closeTo(0.25, 1e-9));
+
+      engine.dispose();
+      backend.dispose();
+    });
+
+    test('exposes curated modulation route suggestions', () async {
+      final backend = BasicAudioBackend();
+      final engine = AudioEngine(backend: backend);
+
+      final suggestions = engine.modulationRouteSuggestions;
+
+      expect(suggestions, isNotEmpty);
+      expect(
+        suggestions,
+        anyElement(
+          predicate<ModulationRouteSuggestion>(
+            (suggestion) =>
+                suggestion.sourceId == 'lfo1' &&
+                suggestion.destinationId == 'filterCutoff',
+          ),
+        ),
+      );
+
+      final filtered = engine.suggestedModulationRoutes(
+        sourceCategory: 'Modulators',
+        destinationCategory: 'Filter',
+      );
+
+      expect(filtered, isNotEmpty);
+      expect(
+        filtered.every(
+          (suggestion) =>
+              suggestion.sourceCategory == 'Modulators' &&
+              suggestion.destinationCategory == 'Filter',
+        ),
+        isTrue,
+      );
 
       engine.dispose();
       backend.dispose();
