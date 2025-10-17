@@ -20,6 +20,31 @@ import 'synth_preset.dart';
 import 'voice_allocator.dart';
 import 'tempo_transport.dart';
 
+/// Aggregated usage data describing how often curated modulation suggestions
+/// are triggered during a session.
+class ModulationSuggestionUsage {
+  const ModulationSuggestionUsage({
+    required this.suggestion,
+    required this.usageCount,
+    required this.lastUsedOrder,
+  });
+
+  /// Metadata-rich suggestion that was interacted with.
+  final ModulationRouteSuggestion suggestion;
+
+  /// Number of times the suggestion has been used.
+  final int usageCount;
+
+  /// Monotonic order indicating when the suggestion was last triggered.
+  final int lastUsedOrder;
+
+  /// Convenience access to the canonical identifier.
+  String get id => suggestion.id;
+
+  /// Tags describing the vibe of the suggestion.
+  List<String> get tags => suggestion.tags;
+}
+
 /// High level controller that exposes the synthesiser behaviour to the UI.
 ///
 /// The legacy project expected a complex native audio engine.  The new
@@ -158,6 +183,7 @@ class AudioEngine extends ChangeNotifier {
   static AudioEngine? _bridgeOwner;
   static final ParameterRegistry _parameterRegistry =
       ParameterRegistry.instance;
+  static const int _maxRecentSuggestionHistory = 8;
   static final UnmodifiableListView<SetlistPracticeSegment>
   _emptyPracticeTimeline = UnmodifiableListView<SetlistPracticeSegment>(
     const <SetlistPracticeSegment>[],
@@ -175,6 +201,13 @@ class AudioEngine extends ChangeNotifier {
 
   final VoiceAllocator _voiceAllocator;
   final ModulationMatrix _modulationMatrix = ModulationMatrix();
+
+  final List<String> _recentSuggestionIds = <String>[];
+  final LinkedHashSet<String> _favouriteSuggestionIds =
+      LinkedHashSet<String>();
+  final Map<String, _SuggestionUsageTracker> _suggestionUsageTrackers =
+      <String, _SuggestionUsageTracker>{};
+  int _suggestionUsageOrder = 0;
 
   double _masterVolume =
       _parameterRegistry.defaultValue('masterVolume') ?? 0.75;
@@ -371,6 +404,246 @@ class AudioEngine extends ChangeNotifier {
       _transportTimeSignatureDenominator.round().clamp(1, 16).toInt();
   double get transportPositionBeats => _transportPositionBeats;
   List<ModulationRoute> get modulationRoutes => _modulationMatrix.routes;
+
+  /// Rich metadata describing the modulation sources the UI can present.
+  List<ModulationSourceDescriptor> get modulationSourceDescriptors =>
+      ModulationRoutingMetadata.sourceDescriptors;
+
+  /// Metadata describing curated modulation destinations for UI presentation.
+  List<ModulationDestinationDescriptor> get modulationDestinationDescriptors =>
+      ModulationRoutingMetadata.destinationDescriptors;
+
+  /// Curated modulation route suggestions for quick UI affordances.
+  List<ModulationRouteSuggestion> get modulationRouteSuggestions =>
+      ModulationRoutingMetadata.suggestedRoutes();
+
+  /// All curated suggestion tags for guiding UI filters.
+  List<String> get modulationRouteSuggestionTags =>
+      ModulationRoutingMetadata.suggestionTags();
+
+  /// Curated bundles of suggestions grouped by workflow focus.
+  List<ModulationSuggestionBundle> get modulationSuggestionBundles =>
+      ModulationRoutingMetadata.suggestionBundles();
+
+  /// Suggestions that belong to the bundle identified by [bundleId].
+  List<ModulationRouteSuggestion> bundleSuggestions(String bundleId) =>
+      ModulationRoutingMetadata.routesForBundle(bundleId);
+
+  /// Favourited suggestions in user-defined order.
+  List<ModulationRouteSuggestion> get favouriteModulationRouteSuggestions =>
+      ModulationRoutingMetadata.suggestionsForIds(_favouriteSuggestionIds);
+
+  /// Identifiers for favourited suggestions.
+  List<String> get favouriteModulationSuggestionIds =>
+      List<String>.unmodifiable(_favouriteSuggestionIds);
+
+  /// Recently used suggestions ordered by newest first.
+  List<ModulationRouteSuggestion> get recentModulationRouteSuggestions =>
+      ModulationRoutingMetadata.suggestionsForIds(_recentSuggestionIds);
+
+  /// Identifiers for recently used suggestions.
+  List<String> get recentModulationSuggestionIds =>
+      List<String>.unmodifiable(_recentSuggestionIds);
+
+  /// Aggregated usage summaries sorted by frequency and recency.
+  List<ModulationSuggestionUsage> get suggestionUsageSummaries {
+    if (_suggestionUsageTrackers.isEmpty) {
+      return const <ModulationSuggestionUsage>[];
+    }
+
+    final summaries = <ModulationSuggestionUsage>[];
+    _suggestionUsageTrackers.forEach((id, tracker) {
+      final suggestion = ModulationRoutingMetadata.suggestionById(id);
+      if (suggestion == null) {
+        return;
+      }
+      summaries.add(
+        ModulationSuggestionUsage(
+          suggestion: suggestion,
+          usageCount: tracker.count,
+          lastUsedOrder: tracker.lastUsedOrder,
+        ),
+      );
+    });
+
+    summaries.sort((a, b) {
+      final countComparison = b.usageCount.compareTo(a.usageCount);
+      if (countComparison != 0) {
+        return countComparison;
+      }
+      return b.lastUsedOrder.compareTo(a.lastUsedOrder);
+    });
+
+    return List<ModulationSuggestionUsage>.unmodifiable(summaries);
+  }
+
+  /// Highest ranked suggestions based on tracked usage frequency.
+  List<ModulationRouteSuggestion> topModulationSuggestions({int limit = 3}) {
+    final summaries = suggestionUsageSummaries;
+    if (summaries.isEmpty || limit <= 0) {
+      return const <ModulationRouteSuggestion>[];
+    }
+    final slice = summaries.take(limit).map((summary) => summary.suggestion);
+    return List<ModulationRouteSuggestion>.unmodifiable(slice);
+  }
+
+  /// Tags aggregated from suggestion usage ordered by popularity.
+  List<String> topModulationSuggestionTags({int limit = 6}) {
+    if (_suggestionUsageTrackers.isEmpty || limit <= 0) {
+      return const <String>[];
+    }
+
+    final tagWeights = <String, int>{};
+    _suggestionUsageTrackers.forEach((id, tracker) {
+      final suggestion = ModulationRoutingMetadata.suggestionById(id);
+      if (suggestion == null || suggestion.tags.isEmpty) {
+        return;
+      }
+      for (final tag in suggestion.tags) {
+        tagWeights[tag] = (tagWeights[tag] ?? 0) + tracker.count;
+      }
+    });
+
+    if (tagWeights.isEmpty) {
+      return const <String>[];
+    }
+
+    final sorted = tagWeights.entries.toList(growable: false)
+      ..sort((a, b) {
+        final countComparison = b.value.compareTo(a.value);
+        if (countComparison != 0) {
+          return countComparison;
+        }
+        return a.key.toLowerCase().compareTo(b.key.toLowerCase());
+      });
+
+    return List<String>.unmodifiable(
+      sorted.take(limit).map((entry) => entry.key).toList(growable: false),
+    );
+  }
+
+  /// Returns whether [suggestionId] is favourited by the user.
+  bool isSuggestionFavourite(String suggestionId) =>
+      _favouriteSuggestionIds.contains(suggestionId);
+
+  /// Toggles the favourite state for the suggestion referenced by [suggestionId].
+  bool toggleFavouriteSuggestion(String suggestionId, {bool notify = true}) {
+    final suggestion =
+        ModulationRoutingMetadata.suggestionById(suggestionId);
+    if (suggestion == null) {
+      return false;
+    }
+
+    var changed = false;
+    if (_favouriteSuggestionIds.contains(suggestionId)) {
+      changed = _favouriteSuggestionIds.remove(suggestionId);
+    } else {
+      changed = _favouriteSuggestionIds.add(suggestionId);
+    }
+
+    if (changed && notify) {
+      notifyListeners();
+    }
+    return changed;
+  }
+
+  /// Registers usage of [suggestionId] for recent history tracking.
+  bool registerSuggestionUsage(String suggestionId, {bool notify = true}) {
+    final suggestion =
+        ModulationRoutingMetadata.suggestionById(suggestionId);
+    if (suggestion == null) {
+      return false;
+    }
+
+    final changed = _recordSuggestionUsage(suggestionId);
+    if (changed && notify) {
+      notifyListeners();
+    }
+    return changed;
+  }
+
+  /// Clears the recent suggestion history.
+  bool clearRecentModulationSuggestions({bool notify = true}) {
+    if (_recentSuggestionIds.isEmpty) {
+      return false;
+    }
+
+    _recentSuggestionIds.clear();
+    if (notify) {
+      notifyListeners();
+    }
+    return true;
+  }
+
+  /// Resets tracked suggestion usage metrics (counts and popularity insights).
+  bool resetSuggestionUsageMetrics({bool notify = true}) {
+    if (_suggestionUsageTrackers.isEmpty && _suggestionUsageOrder == 0) {
+      return false;
+    }
+
+    _suggestionUsageTrackers.clear();
+    _suggestionUsageOrder = 0;
+    if (notify) {
+      notifyListeners();
+    }
+    return true;
+  }
+
+  /// Applies all routes defined by the bundle [bundleId].
+  List<ModulationRouteSuggestion> applyModulationSuggestionBundle(
+    String bundleId, {
+    bool notify = true,
+  }) {
+    final suggestions =
+        ModulationRoutingMetadata.routesForBundle(bundleId);
+    if (suggestions.isEmpty) {
+      return const <ModulationRouteSuggestion>[];
+    }
+
+    final applied = <ModulationRouteSuggestion>[];
+    var matrixChanged = false;
+    var usageChanged = false;
+    for (final suggestion in suggestions) {
+      final route = ModulationRoute(
+        source: suggestion.sourceId,
+        destination: suggestion.destinationId,
+        amount: suggestion.defaultAmount,
+      );
+      final changed = _applyModulationRoute(route, emitToBridge: true);
+      if (changed) {
+        applied.add(suggestion);
+        matrixChanged = true;
+      }
+      usageChanged = _recordSuggestionUsage(suggestion.id) || usageChanged;
+    }
+
+    if (matrixChanged) {
+      _activePreset = _activePreset?.copyWith(
+        modulationRoutes: _modulationMatrix.routes,
+      );
+      if (notify) {
+        notifyListeners();
+      }
+    } else if (usageChanged && notify) {
+      notifyListeners();
+    }
+
+    return List<ModulationRouteSuggestion>.unmodifiable(applied);
+  }
+
+  /// Returns modulation suggestions filtered by optional categories, tags, or query.
+  List<ModulationRouteSuggestion> suggestedModulationRoutes({
+    String? sourceCategory,
+    String? destinationCategory,
+    Iterable<String>? tags,
+    String? query,
+  }) =>
+      ModulationRoutingMetadata.suggestedRoutes(
+        sourceCategory: sourceCategory,
+        destinationCategory: destinationCategory,
+        requiredTags: tags,
+        query: query,
+      );
 
   /// Curated list of modulation sources the UI should expose.
   List<String> get availableModulationSources =>
@@ -2449,6 +2722,44 @@ class AudioEngine extends ChangeNotifier {
     return true;
   }
 
+  bool _recordSuggestionUsage(String suggestionId) {
+    var changed = false;
+
+    final tracker = _suggestionUsageTrackers.putIfAbsent(
+      suggestionId,
+      () => _SuggestionUsageTracker(),
+    );
+    tracker.count++;
+    final newOrder = ++_suggestionUsageOrder;
+    if (tracker.lastUsedOrder != newOrder) {
+      tracker.lastUsedOrder = newOrder;
+    }
+    changed = true;
+
+    if (_recentSuggestionIds.isEmpty ||
+        _recentSuggestionIds.first != suggestionId) {
+      changed = true;
+    }
+
+    final removed = _recentSuggestionIds.remove(suggestionId);
+    if (removed) {
+      changed = true;
+    }
+
+    _recentSuggestionIds.insert(0, suggestionId);
+
+    if (_recentSuggestionIds.length > _maxRecentSuggestionHistory) {
+      _recentSuggestionIds.removeRange(
+        _maxRecentSuggestionHistory,
+        _recentSuggestionIds.length,
+      );
+      changed = true;
+    }
+
+    return changed;
+  }
+
+
   bool _removeModulationRoute(
     String source,
     String destination, {
@@ -2679,4 +2990,9 @@ class AudioEngine extends ChangeNotifier {
       orElse: () => SynthPresetCategory.user,
     );
   }
+}
+
+class _SuggestionUsageTracker {
+  int count = 0;
+  int lastUsedOrder = 0;
 }
