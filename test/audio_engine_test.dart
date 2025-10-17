@@ -7,6 +7,7 @@ import 'package:synther_holographic_pro/core/basic_audio_backend.dart';
 import 'package:synther_holographic_pro/core/parameter_bridge.dart';
 import 'package:synther_holographic_pro/core/parameter_definitions.dart';
 import 'package:synther_holographic_pro/core/modulation_matrix.dart';
+import 'package:synther_holographic_pro/core/modulation_metadata.dart';
 import 'package:synther_holographic_pro/core/synth_preset.dart';
 import 'package:synther_holographic_pro/core/voice_allocator.dart';
 import 'package:synther_holographic_pro/core/preset_setlist.dart';
@@ -1177,6 +1178,24 @@ void main() {
 
       expect(engine.availableModulationSources, contains('modWheel'));
       expect(engine.availableModulationDestinations, contains('filterCutoff'));
+      expect(
+        engine.modulationSourceDescriptors
+            .where((descriptor) => descriptor.id == 'modWheel')
+            .single
+            .category,
+        'Performance',
+      );
+      expect(
+        engine.modulationDestinationDescriptors
+            .where((descriptor) => descriptor.id == 'filterCutoff')
+            .single
+            .category,
+        'Filter',
+      );
+      expect(
+        ModulationRoutingMetadata.labelForSource('aftertouch'),
+        'Channel Aftertouch',
+      );
 
       engine.setModulationRoute(
         const ModulationRoute(
@@ -1200,6 +1219,74 @@ void main() {
       expect(sourceTotals['expression'], closeTo(0.25, 1e-9));
       expect(destinationTotals['filterCutoff'], closeTo(0.5, 1e-9));
       expect(destinationTotals['distortionDrive'], closeTo(0.25, 1e-9));
+
+      engine.dispose();
+      backend.dispose();
+    });
+
+    test('exposes curated modulation route suggestions', () async {
+      final backend = BasicAudioBackend();
+      final engine = AudioEngine(backend: backend);
+
+      final suggestions = engine.modulationRouteSuggestions;
+
+      expect(suggestions, isNotEmpty);
+      expect(
+        suggestions,
+        anyElement(
+          predicate<ModulationRouteSuggestion>(
+            (suggestion) =>
+                suggestion.sourceId == 'lfo1' &&
+                suggestion.destinationId == 'filterCutoff',
+          ),
+        ),
+      );
+      expect(
+        suggestions,
+        anyElement(
+          predicate<ModulationRouteSuggestion>(
+            (suggestion) => suggestion.tags.contains('Filter'),
+          ),
+        ),
+      );
+
+      final tags = engine.modulationRouteSuggestionTags;
+      expect(tags, contains('Granular'));
+      expect(tags, isNotEmpty);
+
+      final filtered = engine.suggestedModulationRoutes(
+        sourceCategory: 'Modulators',
+        destinationCategory: 'Filter',
+      );
+
+      expect(filtered, isNotEmpty);
+      expect(
+        filtered.every(
+          (suggestion) =>
+              suggestion.sourceCategory == 'Modulators' &&
+              suggestion.destinationCategory == 'Filter',
+        ),
+        isTrue,
+      );
+
+      final tagFiltered = engine.suggestedModulationRoutes(
+        tags: const <String>['Granular'],
+      );
+      expect(tagFiltered, isNotEmpty);
+      expect(
+        tagFiltered.every(
+          (suggestion) => suggestion.tags
+              .map((tag) => tag.toLowerCase())
+              .contains('granular'),
+        ),
+        isTrue,
+      );
+
+      final queryFiltered = engine.suggestedModulationRoutes(
+        query: 'performance texture',
+      );
+      expect(queryFiltered.map((suggestion) => suggestion.destinationId),
+          contains('wavetablePosition'));
 
       engine.dispose();
       backend.dispose();
@@ -1425,6 +1512,130 @@ void main() {
       );
       expect(loopBlocked, isFalse);
       expect(engine.setlistPracticeSnapshot?.current?.entry.id, 'slot-3');
+
+      engine.dispose();
+      backend.dispose();
+    });
+  });
+
+  group('Modulation suggestion utilities', () {
+    test('toggleFavouriteSuggestion tracks favourites and notifies listeners',
+        () async {
+      final backend = BasicAudioBackend();
+      final engine = AudioEngine(backend: backend);
+
+      expect(await engine.initialize(), isTrue);
+
+      final notifications = <int>[];
+      engine.addListener(() {
+        notifications.add(engine.favouriteModulationSuggestionIds.length);
+      });
+
+      const suggestionId = 'lfo1_filter_cutoff_classic';
+
+      expect(engine.isSuggestionFavourite(suggestionId), isFalse);
+      final added = engine.toggleFavouriteSuggestion(suggestionId);
+      expect(added, isTrue);
+      expect(engine.isSuggestionFavourite(suggestionId), isTrue);
+      expect(engine.favouriteModulationSuggestionIds, contains(suggestionId));
+      expect(notifications, isNotEmpty);
+
+      final removed = engine.toggleFavouriteSuggestion(suggestionId);
+      expect(removed, isTrue);
+      expect(engine.isSuggestionFavourite(suggestionId), isFalse);
+
+      engine.dispose();
+      backend.dispose();
+    });
+
+    test('registerSuggestionUsage maintains bounded history', () async {
+      final backend = BasicAudioBackend();
+      final engine = AudioEngine(backend: backend);
+
+      expect(await engine.initialize(), isTrue);
+
+      final suggestionIds = ModulationRoutingMetadata.suggestedRoutes()
+          .map((suggestion) => suggestion.id)
+          .take(10)
+          .toList(growable: false);
+
+      for (final id in suggestionIds) {
+        engine.registerSuggestionUsage(id);
+      }
+
+      expect(engine.recentModulationSuggestionIds.length, lessThanOrEqualTo(8));
+      expect(
+        engine.recentModulationSuggestionIds.first,
+        suggestionIds.last,
+      );
+
+      engine.dispose();
+      backend.dispose();
+    });
+
+    test('applyModulationSuggestionBundle applies curated routes', () async {
+      final backend = BasicAudioBackend();
+      final engine = AudioEngine(backend: backend);
+
+      expect(await engine.initialize(), isTrue);
+
+      final applied =
+          engine.applyModulationSuggestionBundle('performance_expressives');
+
+      expect(applied, isNotEmpty);
+      final first = applied.first;
+      expect(
+        engine.modulationRoutes.any(
+          (route) =>
+              route.source == first.sourceId &&
+              route.destination == first.destinationId,
+        ),
+        isTrue,
+      );
+      expect(engine.recentModulationSuggestionIds, isNotEmpty);
+
+      engine.dispose();
+      backend.dispose();
+    });
+
+    test('suggestion usage metrics surface trending data', () async {
+      final backend = BasicAudioBackend();
+      final engine = AudioEngine(backend: backend);
+
+      expect(await engine.initialize(), isTrue);
+
+      const primaryId = 'mod_wheel_delay_time_swell';
+      const macroId = 'mod_wheel_master_volume_macro';
+      const ambienceId = 'velocity_reverb_mix_dynamics';
+
+      engine.registerSuggestionUsage(primaryId);
+      engine.registerSuggestionUsage(primaryId);
+      engine.registerSuggestionUsage(primaryId);
+      engine.registerSuggestionUsage(macroId);
+      engine.registerSuggestionUsage(ambienceId);
+
+      final summaries = engine.suggestionUsageSummaries;
+      expect(summaries, isNotEmpty);
+      expect(summaries.first.id, primaryId);
+      expect(summaries.first.usageCount, greaterThanOrEqualTo(3));
+
+      final topSuggestions = engine.topModulationSuggestions(limit: 2);
+      expect(topSuggestions.map((suggestion) => suggestion.id), contains(primaryId));
+
+      final topTags = engine.topModulationSuggestionTags(limit: 3);
+      expect(topTags, isNotEmpty);
+      expect(topTags.first, isNotEmpty);
+
+      expect(engine.recentModulationSuggestionIds, isNotEmpty);
+      expect(engine.recentModulationSuggestionIds.first, ambienceId);
+
+      final cleared = engine.clearRecentModulationSuggestions();
+      expect(cleared, isTrue);
+      expect(engine.recentModulationSuggestionIds, isEmpty);
+
+      final reset = engine.resetSuggestionUsageMetrics();
+      expect(reset, isTrue);
+      expect(engine.suggestionUsageSummaries, isEmpty);
 
       engine.dispose();
       backend.dispose();
