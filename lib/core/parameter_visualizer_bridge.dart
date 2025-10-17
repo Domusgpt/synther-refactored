@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'synth_parameters.dart';
@@ -225,7 +226,10 @@ class ParameterVisualizerBridge extends ChangeNotifier {
           transformedValue = (value * value) * binding.scale + binding.offset;
           break;
         case BindingType.logarithmic:
-          transformedValue = (value > 0 ? (value * 10).log() / 10.log() : 0) * binding.scale + binding.offset;
+          final safeValue = value <= 0
+              ? 0.0
+              : math.log(value * 9 + 1) / math.log(10);
+          transformedValue = safeValue * binding.scale + binding.offset;
           break;
       }
       
