@@ -42,6 +42,10 @@ plugins.
    can be sideloaded onto devices or submitted to the Play Store (after the
    usual Play Console steps).
 
+   > **Shortcut:** Run `tool/prepare_android_apk.sh --release` to perform the
+   > toolchain setup and release build in one command. The helper prints the
+   > generated APK path when finished.
+
 ## Web Deployment
 
 1. **Enable the web renderer (one-time)**:
