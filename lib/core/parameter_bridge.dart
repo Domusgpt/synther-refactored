@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
+import 'parameter_models.dart';
+import 'parameter_registry.dart';
+
 /// Central parameter bridge for 3-way synchronization between UI, Audio, and Visualizer
 class ParameterBridge {
   static ParameterBridge? _instance;
@@ -27,7 +30,13 @@ class ParameterBridge {
   void registerAudioHandler(void Function(String, double) handler) {
     _audioHandler = handler;
   }
-  
+
+  void unregisterAudioHandler(void Function(String, double) handler) {
+    if (identical(_audioHandler, handler)) {
+      _audioHandler = null;
+    }
+  }
+
   void registerVisualizerHandler(void Function(String, double) handler) {
     _visualizerHandler = handler;
   }
@@ -85,44 +94,52 @@ class ParameterBridge {
   }
   
   // Parameter mapping definitions
-  static const Map<String, ParameterMapping> mappings = {
-    'filterCutoff': ParameterMapping(
-      min: 20,
-      max: 20000,
-      curve: ParameterCurve.exponential,
-      visualizerParam: 'geometryComplexity',
-    ),
-    'filterResonance': ParameterMapping(
-      min: 0,
-      max: 1,
-      curve: ParameterCurve.linear,
-      visualizerParam: 'colorIntensity',
-    ),
-    'reverbMix': ParameterMapping(
-      min: 0,
-      max: 1,
-      curve: ParameterCurve.linear,
-      visualizerParam: 'spaceSize',
-    ),
-    'xyPadX': ParameterMapping(
-      min: 0,
-      max: 1,
-      curve: ParameterCurve.linear,
-      visualizerParam: 'rotation4D_XY',
-    ),
-    'xyPadY': ParameterMapping(
-      min: 0,
-      max: 1,
-      curve: ParameterCurve.linear,
-      visualizerParam: 'rotation4D_ZW',
-    ),
-    'masterVolume': ParameterMapping(
-      min: 0,
-      max: 1,
-      curve: ParameterCurve.linear,
-      visualizerParam: 'brightness',
-    ),
-  };
+  static final Map<String, ParameterMapping> mappings = _buildMappings();
+
+  static Map<String, ParameterMapping> _buildMappings() {
+    final registry = ParameterRegistry.instance;
+    final map = <String, ParameterMapping>{};
+
+    void registerMapping(String key, ParameterDescriptor descriptor) {
+      map[key] = ParameterMapping(
+        range: descriptor.range,
+        visualizerParam: descriptor.visualizerTarget,
+      );
+    }
+
+    for (final entry in registry.descriptors.entries) {
+      registerMapping(entry.key, entry.value);
+      for (final alias in entry.value.allKeys.skip(1)) {
+        registerMapping(alias, entry.value);
+      }
+    }
+
+    // Preserve XY pad mappings that are not part of the audio registry yet.
+    map.putIfAbsent(
+      'xyPadX',
+      () => ParameterMapping(
+        range: const ParameterRange(min: 0, max: 1, defaultValue: 0.5),
+        visualizerParam: 'rotation4D_XY',
+      ),
+    );
+    map.putIfAbsent(
+      'xyPadY',
+      () => ParameterMapping(
+        range: const ParameterRange(min: 0, max: 1, defaultValue: 0.5),
+        visualizerParam: 'rotation4D_ZW',
+      ),
+    );
+
+    return map;
+  }
+
+  @visibleForTesting
+  void resetForTesting() {
+    _parameters.clear();
+    _audioHandler = null;
+    _visualizerHandler = null;
+    _uiHandler = null;
+  }
   
   void dispose() {
     _parameterController.close();
@@ -146,58 +163,23 @@ class ParameterUpdate {
 
 /// Parameter mapping configuration
 class ParameterMapping {
-  final double min;
-  final double max;
-  final ParameterCurve curve;
+  final ParameterRange range;
   final String visualizerParam;
-  
+
   const ParameterMapping({
-    required this.min,
-    required this.max,
-    required this.curve,
+    required this.range,
     required this.visualizerParam,
   });
-  
-  // Map value to normalized range
-  double normalize(double value) {
-    final clamped = value.clamp(min, max);
-    final normalized = (clamped - min) / (max - min);
-    
-    switch (curve) {
-      case ParameterCurve.linear:
-        return normalized;
-      case ParameterCurve.exponential:
-        return normalized * normalized;
-      case ParameterCurve.logarithmic:
-        return normalized.sign * normalized.abs().log() / 2.3; // ln(10)
-    }
-  }
-  
-  // Map normalized value back to real range
-  double denormalize(double normalized) {
-    double curved;
-    
-    switch (curve) {
-      case ParameterCurve.linear:
-        curved = normalized;
-        break;
-      case ParameterCurve.exponential:
-        curved = normalized.sign * normalized.abs().sqrt();
-        break;
-      case ParameterCurve.logarithmic:
-        curved = normalized.sign * (normalized.abs() * 2.3).exp();
-        break;
-    }
-    
-    return min + curved * (max - min);
-  }
-}
 
-/// Parameter curve types
-enum ParameterCurve {
-  linear,
-  exponential,
-  logarithmic,
+  double get min => range.min;
+  double get max => range.max;
+  ParameterCurve get curve => range.curve;
+
+  // Map value to normalized range
+  double normalize(double value) => range.normalize(value);
+
+  // Map normalized value back to real range
+  double denormalize(double normalized) => range.denormalize(normalized);
 }
 
 /// Mixin for widgets that need parameter bridge integration
