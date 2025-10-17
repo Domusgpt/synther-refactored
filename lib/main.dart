@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'core/audio_engine.dart';
+import 'core/preset_setlist.dart';
 import 'ui/vaporwave_interface.dart';
+import 'utils/preset_setlist_persistence.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +55,14 @@ class HolographicSynthApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => AudioEngine(),
+      create: (context) {
+        final engine = AudioEngine();
+        final persistence = PresetSetlistPersistence(
+          library: PresetSetlistLibrary.instance,
+        );
+        engine.attachSetlistPersistence(persistence, load: true);
+        return engine;
+      },
       child: MaterialApp(
         title: 'Holographic Synth Pro',
         debugShowCheckedModeBanner: false,
@@ -65,7 +74,7 @@ class HolographicSynthApp extends StatelessWidget {
             primary: Color(0xFF00FFFF),
             secondary: Color(0xFFFF00FF),
             surface: Color(0xFF000010),
-            surface: Color(0xFF000000),
+            background: Color(0xFF000000),
           ),
           fontFamily: 'monospace',
         ),
